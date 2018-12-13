@@ -1,44 +1,61 @@
 import torch
+import json
+import pickle
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 
 # Load pre-trained model tokenizer (vocabulary)
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-# Tokenized input
-text = "Who was Jim Henson ? Jim Henson was a puppeteer"
-tokenized_text = tokenizer.tokenize(text)
-
-# Mask a token that we will try to predict back with `BertForMaskedLM`
-masked_index = 6
-tokenized_text[masked_index] = '[MASK]'
-assert tokenized_text == ['who', 'was', 'jim', 'henson', '?', 'jim', '[MASK]', 'was', 'a', 'puppet', '##eer']
-
-# Convert token to vocabulary indices
-indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-# Define sentence A and B indices associated to 1st and 2nd sentences (see paper)
-segments_ids = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
-
-# Convert inputs to PyTorch tensors
-tokens_tensor = torch.tensor([indexed_tokens])
-segments_tensors = torch.tensor([segments_ids])
-
-model = BertModel.from_pretrained('bert-base-uncased')
-model.eval()
-
-# Predict hidden states features for each layer
-encoded_layers, _ = model(tokens_tensor, segments_tensors)
-# We have a hidden states for each of the 12 layers in model bert-base-uncased
-assert len(encoded_layers) == 12
-
 model = BertForMaskedLM.from_pretrained('bert-base-uncased')
 model.eval()
 
-# Predict all tokens
-predictions = model(tokens_tensor, segments_tensors)
+with open("../squad2/data/dev-v2.0.json", 'r') as handle:
+    jdata = json.load(handle)
+    data = jdata['data']
 
-# confirm we were able to predict 'henson'
-predicted_index = torch.argmax(predictions[0, masked_index]).item()
-predicted_token = tokenizer.convert_ids_to_tokens([predicted_index])[0]
-assert predicted_token == 'henson'
+def calc_prob(context, question):
+    gt_question = question
+    gt_q_tokens = tokenizer.tokenize(gt_question)
+    gt_indexed_q_tokens = tokenizer.convert_tokens_to_ids(gt_q_tokens)
+    
+    mask_tokens = ["[MASK]"]*len(gt_indexed_q_tokens)
+    indexed_mask_tokens = tokenizer.convert_tokens_to_ids(mask_tokens)
+    
+    context_tokens = tokenizer.tokenize(context)
+    indexed_context_tokens = tokenizer.convert_tokens_to_ids(context_tokens)
+    
+    tokens_tensor = torch.tensor([indexed_context_tokens + indexed_mask_tokens])
+    segments_tensors = torch.tensor([0]*len(indexed_context_tokens) + [1]*len(indexed_mask_tokens))
+    predictions = model(tokens_tensor, segments_tensors)
+    
+    total = 0
+    context_len = len(context_tokens)
+    q_len = len(indexed_mask_tokens)
+    for i in range(q_len):
+        total += predictions[0,context_len+i,gt_indexed_q_tokens[i]].item()
+    return total
 
-print("Wow it works")
+answerable_probs = []
+unanswerable_probs = []
+counter = 0
+for i in range(len(data)):
+    section = data[i]['paragraphs']
+    for sec in section:
+        context = sec['context']
+        qas = sec['qas']
+        for j in range(len(qas)):
+            question = qas[j]['question']
+            label = qas[j]['is_impossible']
+            prob = calc_prob(context, question)
+            if label:
+                unanswerable_probs.append(prob)
+            else:
+                answerable_probs.append(prob)
+            counter += 1
+            if counter % 10 == 0:
+                print("Processed ", counter)
+        break
+    break
+
+with open("./results.pkl", "wb") as handle:
+    pickle.dump((answerable_probs, unanswerable_probs), handle)
