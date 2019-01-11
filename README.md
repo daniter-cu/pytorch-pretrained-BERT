@@ -1,5 +1,7 @@
 # PyTorch Pretrained Bert
 
+[![CircleCI](https://circleci.com/gh/huggingface/pytorch-pretrained-BERT.svg?style=svg)](https://circleci.com/gh/huggingface/pytorch-pretrained-BERT)
+
 This repository contains an op-for-op PyTorch reimplementation of [Google's TensorFlow repository for the BERT model](https://github.com/google-research/bert) that was released together with the paper [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805) by Jacob Devlin, Ming-Wei Chang, Kenton Lee and Kristina Toutanova.
 
 This implementation is provided with [Google's pre-trained models](https://github.com/google-research/bert), examples, notebooks and a command-line interface to load any pre-trained TensorFlow checkpoint for BERT is also provided.
@@ -19,7 +21,7 @@ This implementation is provided with [Google's pre-trained models](https://githu
 
 ## Installation
 
-This repo was tested on Python 3.6+ and PyTorch 0.4.1
+This repo was tested on Python 3.5+ and PyTorch 0.4.1/1.0.0
 
 ### With pip
 
@@ -46,14 +48,15 @@ python -m pytest -sv tests/
 
 This package comprises the following classes that can be imported in Python and are detailed in the [Doc](#doc) section of this readme:
 
-- Seven PyTorch models (`torch.nn.Module`) for Bert with pre-trained weights (in the [`modeling.py`](./pytorch_pretrained_bert/modeling.py) file):
+- Eight PyTorch models (`torch.nn.Module`) for Bert with pre-trained weights (in the [`modeling.py`](./pytorch_pretrained_bert/modeling.py) file):
   - [`BertModel`](./pytorch_pretrained_bert/modeling.py#L537) - raw BERT Transformer model (**fully pre-trained**),
   - [`BertForMaskedLM`](./pytorch_pretrained_bert/modeling.py#L691) - BERT Transformer with the pre-trained masked language modeling head on top (**fully pre-trained**),
   - [`BertForNextSentencePrediction`](./pytorch_pretrained_bert/modeling.py#L752) - BERT Transformer with the pre-trained next sentence prediction classifier on top  (**fully pre-trained**),
   - [`BertForPreTraining`](./pytorch_pretrained_bert/modeling.py#L620) - BERT Transformer with masked language modeling head and next sentence prediction classifier on top (**fully pre-trained**),
   - [`BertForSequenceClassification`](./pytorch_pretrained_bert/modeling.py#L814) - BERT Transformer with a sequence classification head on top (BERT Transformer is **pre-trained**, the sequence classification head **is only initialized and has to be trained**),
-  - [`BertForTokenClassification`](./pytorch_pretrained_bert/modeling.py#L880) - BERT Transformer with a token classification head on top (BERT Transformer is **pre-trained**, the token classification head **is only initialized and has to be trained**),
-  - [`BertForQuestionAnswering`](./pytorch_pretrained_bert/modeling.py#L946) - BERT Transformer with a token classification head on top (BERT Transformer is **pre-trained**, the token classification head **is only initialized and has to be trained**).
+  - [`BertForMultipleChoice`](./pytorch_pretrained_bert/modeling.py#L880) - BERT Transformer with a multiple choice head on top (used for task like Swag) (BERT Transformer is **pre-trained**, the multiple choice classification head **is only initialized and has to be trained**),
+  - [`BertForTokenClassification`](./pytorch_pretrained_bert/modeling.py#L949) - BERT Transformer with a token classification head on top (BERT Transformer is **pre-trained**, the token classification head **is only initialized and has to be trained**),
+  - [`BertForQuestionAnswering`](./pytorch_pretrained_bert/modeling.py#L1015) - BERT Transformer with a token classification head on top (BERT Transformer is **pre-trained**, the token classification head **is only initialized and has to be trained**).
 
 - Three tokenizers (in the [`tokenization.py`](./pytorch_pretrained_bert/tokenization.py) file):
   - `BasicTokenizer` - basic tokenization (punctuation splitting, lower casing, etc.),
@@ -64,15 +67,17 @@ This package comprises the following classes that can be imported in Python and 
   - `BertAdam` - Bert version of Adam algorithm with weight decay fix, warmup and linear decay of the learning rate.
 
 - A configuration class (in the [`modeling.py`](./pytorch_pretrained_bert/modeling.py) file):
-  - `BertConfig` - Configuration class to store the configuration of a `BertModel` with utilisities to read and write from JSON configuration files.
+  - `BertConfig` - Configuration class to store the configuration of a `BertModel` with utilities to read and write from JSON configuration files.
 
 The repository further comprises:
 
-- Three examples on how to use Bert (in the [`examples` folder](./examples)):
+- Five examples on how to use Bert (in the [`examples` folder](./examples)):
   - [`extract_features.py`](./examples/extract_features.py) - Show how to extract hidden states from an instance of `BertModel`,
   - [`run_classifier.py`](./examples/run_classifier.py) - Show how to fine-tune an instance of `BertForSequenceClassification` on GLUE's MRPC task,
   - [`run_squad.py`](./examples/run_squad.py) - Show how to fine-tune an instance of `BertForQuestionAnswering` on SQuAD v1.0 task.
-
+  - [`run_swag.py`](./examples/run_swag.py) - Show how to fine-tune an instance of `BertForMultipleChoice` on Swag task.
+  - [`run_lm_finetuning`](./examples/run_lm_finetuning.py) - Show how to fine-tune an instance of `BertForPretraining' on a target text corpus.  
+   
   These examples are detailed in the [Examples](#examples) section of this readme.
 
 - Three notebooks that were used to check that the TensorFlow and PyTorch models behave identically (in the [`notebooks` folder](./notebooks)):
@@ -154,7 +159,7 @@ Here is a detailed documentation of the classes in the package and how to use th
 | Sub-section | Description |
 |-|-|
 | [Loading Google AI's pre-trained weigths](#Loading-Google-AIs-pre-trained-weigths-and-PyTorch-dump) | How to load Google AI's pre-trained weight or a PyTorch saved instance |
-| [PyTorch models](#PyTorch-models) | API of the seven PyTorch model classes: `BertModel`, `BertForMaskedLM`, `BertForNextSentencePrediction`, `BertForPreTraining`, `BertForSequenceClassification` or `BertForQuestionAnswering` |
+| [PyTorch models](#PyTorch-models) | API of the eight PyTorch model classes: `BertModel`, `BertForMaskedLM`, `BertForNextSentencePrediction`, `BertForPreTraining`, `BertForSequenceClassification`, `BertForMultipleChoice` or `BertForQuestionAnswering` |
 | [Tokenizer: `BertTokenizer`](#Tokenizer-BertTokenizer) | API of the `BertTokenizer` class|
 | [Optimizer: `BertAdam`](#Optimizer-BertAdam) |  API of the `BertAdam` class |
 
@@ -163,12 +168,12 @@ Here is a detailed documentation of the classes in the package and how to use th
 To load one of Google AI's pre-trained models or a PyTorch saved model (an instance of `BertForPreTraining` saved with `torch.save()`), the PyTorch model classes and the tokenizer can be instantiated as
 
 ```python
-model = BERT_CLASS.from_pretrain(PRE_TRAINED_MODEL_NAME_OR_PATH, cache_dir=None)
+model = BERT_CLASS.from_pretrained(PRE_TRAINED_MODEL_NAME_OR_PATH, cache_dir=None)
 ```
 
 where
 
-- `BERT_CLASS` is either the `BertTokenizer` class (to load the vocabulary) or one of the seven PyTorch model classes (to load the pre-trained weights): `BertModel`, `BertForMaskedLM`, `BertForNextSentencePrediction`, `BertForPreTraining`, `BertForSequenceClassification`, `BertForTokenClassification` or `BertForQuestionAnswering`, and
+- `BERT_CLASS` is either the `BertTokenizer` class (to load the vocabulary) or one of the eight PyTorch model classes (to load the pre-trained weights): `BertModel`, `BertForMaskedLM`, `BertForNextSentencePrediction`, `BertForPreTraining`, `BertForSequenceClassification`, `BertForTokenClassification`, `BertForMultipleChoice` or `BertForQuestionAnswering`, and
 - `PRE_TRAINED_MODEL_NAME_OR_PATH` is either:
 
   - the shortcut name of a Google AI's pre-trained model selected in the list:
@@ -187,14 +192,15 @@ where
     - `pytorch_model.bin` a PyTorch dump of a pre-trained instance `BertForPreTraining` (saved with the usual `torch.save()`)
 
   If `PRE_TRAINED_MODEL_NAME_OR_PATH` is a shortcut name, the pre-trained weights will be downloaded from AWS S3 (see the links [here](pytorch_pretrained_bert/modeling.py)) and stored in a cache folder to avoid future download (the cache folder can be found at `~/.pytorch_pretrained_bert/`).
-- `cache_dir` can be an optional path to a specific directory to download and cache the pre-trained model weights. This option is useful in particular when you are using distributed training: to avoid concurrent access to the same weights you can set for example `cache_dir='./pretrained_model_{}'.format(args.local_rank)` (see the section on distributed training for more information)
+- `cache_dir` can be an optional path to a specific directory to download and cache the pre-trained model weights. This option is useful in particular when you are using distributed training: to avoid concurrent access to the same weights you can set for example `cache_dir='./pretrained_model_{}'.format(args.local_rank)` (see the section on distributed training for more information).
 
 `Uncased` means that the text has been lowercased before WordPiece tokenization, e.g., `John Smith` becomes `john smith`. The Uncased model also strips out any accent markers. `Cased` means that the true case and accent markers are preserved. Typically, the Uncased model is better unless you know that case information is important for your task (e.g., Named Entity Recognition or Part-of-Speech tagging). For information about the Multilingual and Chinese model, see the [Multilingual README](https://github.com/google-research/bert/blob/master/multilingual.md) or the original TensorFlow repository.
 
-**When using an `uncased model`, make sure to pass `--do_lower_case` to the training scripts. (Or pass `do_lower_case=True` directly to FullTokenizer if you're using your own script.)**
+**When using an `uncased model`, make sure to pass `--do_lower_case` to the example training scripts (or pass `do_lower_case=True` to FullTokenizer if you're using your own script and loading the tokenizer your-self.).**
 
 Example:
 ```python
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
 ```
 
@@ -243,6 +249,9 @@ An example on how to use this class is given in the [`extract_features.py`](./ex
 
   - the masked language modeling logits, and
   - the next sentence classification logits.
+  
+An example on how to use this class is given in the [`run_lm_finetuning.py`](./examples/run_lm_finetuning.py) script which can be used to fine-tune the BERT language model on your specific different text corpus. This should improve model performance, if the language style is different from the original BERT training corpus (Wiki + BookCorpus).
+
 
 #### 3. `BertForMaskedLM`
 
@@ -278,13 +287,23 @@ The sequence-level classifier is a linear layer that takes as input the last hid
 
 An example on how to use this class is given in the [`run_classifier.py`](./examples/run_classifier.py) script which can be used to fine-tune a single sequence (or pair of sequence) classifier using BERT, for example for the MRPC task.
 
-#### 6. `BertForTokenClassification`
+#### 6. `BertForMultipleChoice`
+
+`BertForMultipleChoice` is a fine-tuning model that includes `BertModel` and a linear layer on top of the `BertModel`.
+
+The linear layer outputs a single value for each choice of a multiple choice problem, then all the outputs corresponding to an instance are passed through a softmax to get the model choice.
+
+This implementation is largely inspired by the work of OpenAI in [Improving Language Understanding by Generative Pre-Training](https://blog.openai.com/language-unsupervised/) and the answer of Jacob Devlin in the following [issue](https://github.com/google-research/bert/issues/38).
+
+An example on how to use this class is given in the [`run_swag.py`](./examples/run_swag.py) script which can be used to fine-tune a multiple choice classifier using BERT, for example for the Swag task.
+
+#### 7. `BertForTokenClassification`
 
 `BertForTokenClassification` is a fine-tuning model that includes `BertModel` and a token-level classifier on top of the `BertModel`.
 
 The token-level classifier is a linear layer that takes as input the last hidden state of the sequence.
 
-#### 7. `BertForQuestionAnswering`
+#### 8. `BertForQuestionAnswering`
 
 `BertForQuestionAnswering` is a fine-tuning model that includes `BertModel` with a token-level classifiers on top of the full sequence of last hidden states.
 
@@ -326,7 +345,7 @@ The optimizer accepts the following arguments:
 - `b1` : Adams b1. Default : `0.9`
 - `b2` : Adams b2. Default : `0.999`
 - `e` : Adams epsilon. Default : `1e-6`
-- `weight_decay_rate:` Weight decay. Default : `0.01`
+- `weight_decay:` Weight decay. Default : `0.01`
 - `max_grad_norm` : Maximum norm for the gradients (`-1` means no clipping). Default : `1.0`
 
 ## Examples
@@ -334,22 +353,23 @@ The optimizer accepts the following arguments:
 | Sub-section | Description |
 |-|-|
 | [Training large models: introduction, tools and examples](#Training-large-models-introduction,-tools-and-examples) | How to use gradient-accumulation, multi-gpu training, distributed training, optimize on CPU and 16-bits training to train Bert models |
-| [Fine-tuning with BERT: running the examples](#Fine-tuning-with-BERT-running-the-examples) | Running the examples in [`./examples`](./examples/): `extract_classif.py`, `run_classifier.py` and `run_squad.py` |
+| [Fine-tuning with BERT: running the examples](#Fine-tuning-with-BERT-running-the-examples) | Running the examples in [`./examples`](./examples/): `extract_classif.py`, `run_classifier.py`, `run_squad.py` and `run_lm_finetuning.py` |
 | [Fine-tuning BERT-large on GPUs](#Fine-tuning-BERT-large-on-GPUs) | How to fine tune `BERT large`|
 
 ### Training large models: introduction, tools and examples
 
 BERT-base and BERT-large are respectively 110M and 340M parameters models and it can be difficult to fine-tune them on a single GPU with the recommended batch size for good performance (in most case a batch size of 32).
 
-To help with fine-tuning these models, we have included five techniques that you can activate in the fine-tuning scripts [`run_classifier.py`](./examples/run_classifier.py) and [`run_squad.py`](./examples/run_squad.py): gradient-accumulation, multi-gpu training, distributed training, optimize on CPU and 16-bits training . For more details on how to use these techniques you can read [the tips on training large batches in PyTorch](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255) that I published earlier this month.
+To help with fine-tuning these models, we have included several techniques that you can activate in the fine-tuning scripts [`run_classifier.py`](./examples/run_classifier.py) and [`run_squad.py`](./examples/run_squad.py): gradient-accumulation, multi-gpu training, distributed training and 16-bits training . For more details on how to use these techniques you can read [the tips on training large batches in PyTorch](https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255) that I published earlier this month.
 
 Here is how to use these techniques in our scripts:
 
 - **Gradient Accumulation**: Gradient accumulation can be used by supplying a integer greater than 1 to the `--gradient_accumulation_steps` argument. The batch at each step will be divided by this integer and gradient will be accumulated over `gradient_accumulation_steps` steps.
 - **Multi-GPU**: Multi-GPU is automatically activated when several GPUs are detected and the batches are splitted over the GPUs.
 - **Distributed training**: Distributed training can be activated by supplying an integer greater or equal to 0 to the `--local_rank` argument (see below).
-- **Optimize on CPU**: The Adam optimizer stores 2 moving average of the weights of the model. If you keep them on GPU 1 (typical behavior), your first GPU will have to store 3-times the size of the model. This is not optimal for large models like `BERT-large` and means your batch size is a lot lower than it could be. This option will perform the optimization and store the averages on the CPU/RAM to free more room on the GPU(s). As the most computational intensive operation is usually the backward pass, this doesn't have a significant impact on the training time. Activate this option with `--optimize_on_cpu` on the [`run_squad.py`](./examples/run_squad.py) script.
-- **16-bits training**: 16-bits training, also called mixed-precision training, can reduce the memory requirement of your model on the GPU by using half-precision training, basically allowing to double the batch size. If you have a recent GPU (starting from NVIDIA Volta architecture) you should see no decrease in speed. A good introduction to Mixed precision training can be found [here](https://devblogs.nvidia.com/mixed-precision-training-deep-neural-networks/) and a full documentation is [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html). In our scripts, this option can be activated by setting the `--fp16` flag and you can play with loss scaling using the `--loss_scaling` flag (see the previously linked documentation for details on loss scaling). If the loss scaling is too high (`Nan` in the gradients) it will be automatically scaled down until the value is acceptable. The default loss scaling is 128 which behaved nicely in our tests.
+- **16-bits training**: 16-bits training, also called mixed-precision training, can reduce the memory requirement of your model on the GPU by using half-precision training, basically allowing to double the batch size. If you have a recent GPU (starting from NVIDIA Volta architecture) you should see no decrease in speed. A good introduction to Mixed precision training can be found [here](https://devblogs.nvidia.com/mixed-precision-training-deep-neural-networks/) and a full documentation is [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html). In our scripts, this option can be activated by setting the `--fp16` flag and you can play with loss scaling using the `--loss_scale` flag (see the previously linked documentation for details on loss scaling). The loss scale can be zero in which case the scale is dynamically adjusted or a positive power of two in which case the scaling is static.
+
+To use 16-bits training and distributed training, you need to install NVIDIA's apex extension [as detailed here](https://github.com/nvidia/apex). You will find more information regarding the internals of `apex` and how to use `apex` in [the doc and the associated repository](https://github.com/nvidia/apex). The results of the tests performed on pytorch-BERT by the NVIDIA team (and my trials at reproducing them) can be consulted in [the relevant PR of the present repository](https://github.com/huggingface/pytorch-pretrained-BERT/pull/116).
 
 Note: To use *Distributed Training*, you will need to run one training script on each of your machines. This can be done for example by running the following command on each server (see [the above mentioned blog post]((https://medium.com/huggingface/training-larger-batches-practical-tips-on-1-gpu-multi-gpu-distributed-setups-ec88c3e51255)) for more details):
 ```bash
@@ -359,16 +379,22 @@ Where `$THIS_MACHINE_INDEX` is an sequential index assigned to each of your mach
 
 ### Fine-tuning with BERT: running the examples
 
-We showcase the same examples as [the original implementation](https://github.com/google-research/bert/): fine-tuning a sequence-level classifier on the MRPC classification corpus and a token-level classifier on the question answering dataset SQuAD.
+We showcase several fine-tuning examples based on (and extended from) [the original implementation](https://github.com/google-research/bert/):
 
-Before running these examples you should download the
+- a *sequence-level classifier* on the MRPC classification corpus,
+- a *token-level classifier* on the question answering dataset SQuAD, and
+- a *sequence-level multiple-choice classifier* on the SWAG classification corpus.
+- a *BERT language model* on another target corpus
+ 
+#### MRPC
+
+This example code fine-tunes BERT on the Microsoft Research Paraphrase
+Corpus (MRPC) corpus and runs in less than 10 minutes on a single K-80 and in 27 seconds (!) on single tesla V100 16GB with apex installed.
+
+Before running this example you should download the
 [GLUE data](https://gluebenchmark.com/tasks) by running
 [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e)
-and unpack it to some directory `$GLUE_DIR`. Please also download the `BERT-Base`
-checkpoint, unzip it to some directory `$BERT_BASE_DIR`, and convert it to its PyTorch version as explained in the previous section.
-
-This example code fine-tunes `BERT-Base` on the Microsoft Research Paraphrase
-Corpus (MRPC) corpus and runs in less than 10 minutes on a single K-80.
+and unpack it to some directory `$GLUE_DIR`.
 
 ```shell
 export GLUE_DIR=/path/to/glue
@@ -389,7 +415,29 @@ python run_classifier.py \
 
 Our test ran on a few seeds with [the original implementation hyper-parameters](https://github.com/google-research/bert#sentence-and-sentence-pair-classification-tasks) gave evaluation results between 84% and 88%.
 
-The second example fine-tunes `BERT-Base` on the SQuAD question answering task.
+**Fast run with apex and 16 bit precision: fine-tuning on MRPC in 27 seconds!**
+First install apex as indicated [here](https://github.com/NVIDIA/apex).
+Then run
+```shell
+export GLUE_DIR=/path/to/glue
+
+python run_classifier.py \
+  --task_name MRPC \
+  --do_train \
+  --do_eval \
+  --do_lower_case \
+  --data_dir $GLUE_DIR/MRPC/ \
+  --bert_model bert-base-uncased \
+  --max_seq_length 128 \
+  --train_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3.0 \
+  --output_dir /tmp/mrpc_output/
+```
+
+#### SQuAD
+
+This example code fine-tunes BERT on the SQuAD dataset. It runs in 24 min (with BERT-base) or 68 min (with BERT-large) on a single tesla V100 16GB.
 
 The data for SQuAD can be downloaded with the following links and should be saved in a `$SQUAD_DIR` directory.
 
@@ -420,6 +468,54 @@ Training with the previous hyper-parameters gave us the following results:
 {"f1": 88.52381567990474, "exact_match": 81.22043519394512}
 ```
 
+#### SWAG
+
+The data for SWAG can be downloaded by cloning the following [repository](https://github.com/rowanz/swagaf)
+
+```shell
+export SWAG_DIR=/path/to/SWAG
+
+python run_swag.py \
+  --bert_model bert-base-uncased \
+  --do_train \
+  --do_lower_case \
+  --do_eval \
+  --data_dir $SWAG_DIR/data \
+  --train_batch_size 16 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3.0 \
+  --max_seq_length 80 \
+  --output_dir /tmp/swag_output/ \
+  --gradient_accumulation_steps 4
+```
+
+Training with the previous hyper-parameters on a single GPU gave us the following results:
+```
+eval_accuracy = 0.8062081375587323
+eval_loss = 0.5966546792367169
+global_step = 13788
+loss = 0.06423990014260186
+```
+
+#### LM Fine-tuning
+
+The data should be a text file in the same format as [sample_text.txt](./samples/sample_text.txt)  (one sentence per line, docs separated by empty line).
+You can download an [exemplary training corpus](https://ext-bert-sample.obs.eu-de.otc.t-systems.com/small_wiki_sentence_corpus.txt) generated from wikipedia articles and splitted into ~500k sentences with spaCy. 
+Training one epoch on this corpus takes about 1:20h on 4 x NVIDIA Tesla P100 with `train_batch_size=200` and `max_seq_length=128`:
+
+
+```shell
+python run_lm_finetuning.py \
+  --bert_model bert-base-cased 
+  --do_train 
+  --train_file samples/sample_text.txt 
+  --output_dir models 
+  --num_train_epochs 5.0 
+  --learning_rate 3e-5 
+  --train_batch_size 32 
+  --max_seq_length 128 
+```
+
 ## Fine-tuning BERT-large on GPUs
 
 The options we list above allow to fine-tune BERT-large rather easily on GPU(s) instead of the TPU used by the original implementation.
@@ -448,8 +544,7 @@ python ./run_squad.py \
   --doc_stride 128 \
   --output_dir $OUTPUT_DIR \
   --train_batch_size 24 \
-  --gradient_accumulation_steps 2 \
-  --optimize_on_cpu
+  --gradient_accumulation_steps 2 
 ```
 
 If you have a recent GPU (starting from NVIDIA Volta series), you should try **16-bit fine-tuning** (FP16).

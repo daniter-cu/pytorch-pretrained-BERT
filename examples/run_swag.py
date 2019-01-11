@@ -15,16 +15,12 @@
 # limitations under the License.
 """BERT finetuning runner."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import csv
-import os
 import logging
+import os
 import argparse
 import random
 from tqdm import tqdm, trange
+import csv
 
 import numpy as np
 import torch
@@ -32,7 +28,7 @@ from torch.utils.data import TensorDataset, DataLoader, RandomSampler, Sequentia
 from torch.utils.data.distributed import DistributedSampler
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
-from pytorch_pretrained_bert.modeling import BertForSequenceClassification
+from pytorch_pretrained_bert.modeling import BertForMultipleChoice
 from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 
@@ -42,239 +38,171 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
 logger = logging.getLogger(__name__)
 
 
-class InputExample(object):
-    """A single training/test example for simple sequence classification."""
-
-    def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
-
-        Args:
-            guid: Unique id for the example.
-            text_a: string. The untokenized text of the first sequence. For single
-            sequence tasks, only this sequence must be specified.
-            text_b: (Optional) string. The untokenized text of the second sequence.
-            Only must be specified for sequence pair tasks.
-            label: (Optional) string. The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
-        """
-        self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
+class SwagExample(object):
+    """A single training/test example for the SWAG dataset."""
+    def __init__(self,
+                 swag_id,
+                 context_sentence,
+                 start_ending,
+                 ending_0,
+                 ending_1,
+                 ending_2,
+                 ending_3,
+                 label = None):
+        self.swag_id = swag_id
+        self.context_sentence = context_sentence
+        self.start_ending = start_ending
+        self.endings = [
+            ending_0,
+            ending_1,
+            ending_2,
+            ending_3,
+        ]
         self.label = label
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        l = [
+            f"swag_id: {self.swag_id}",
+            f"context_sentence: {self.context_sentence}",
+            f"start_ending: {self.start_ending}",
+            f"ending_0: {self.endings[0]}",
+            f"ending_1: {self.endings[1]}",
+            f"ending_2: {self.endings[2]}",
+            f"ending_3: {self.endings[3]}",
+        ]
+
+        if self.label is not None:
+            l.append(f"label: {self.label}")
+
+        return ", ".join(l)
 
 
 class InputFeatures(object):
-    """A single set of features of data."""
+    def __init__(self,
+                 example_id,
+                 choices_features,
+                 label
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id):
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.label_id = label_id
-
-
-class DataProcessor(object):
-    """Base class for data converters for sequence classification data sets."""
-
-    def get_train_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the train set."""
-        raise NotImplementedError()
-
-    def get_dev_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the dev set."""
-        raise NotImplementedError()
-
-    def get_labels(self):
-        """Gets the list of labels for this data set."""
-        raise NotImplementedError()
-
-    @classmethod
-    def _read_tsv(cls, input_file, quotechar=None):
-        """Reads a tab separated value file."""
-        with open(input_file, "r", encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
-            lines = []
-            for line in reader:
-                lines.append(line)
-            return lines
+    ):
+        self.example_id = example_id
+        self.choices_features = [
+            {
+                'input_ids': input_ids,
+                'input_mask': input_mask,
+                'segment_ids': segment_ids
+            }
+            for _, input_ids, input_mask, segment_ids in choices_features
+        ]
+        self.label = label
 
 
-class MrpcProcessor(DataProcessor):
-    """Processor for the MRPC data set (GLUE version)."""
+def read_swag_examples(input_file, is_training):
+    with open(input_file, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        lines = list(reader)
 
-    def get_train_examples(self, data_dir):
-        """See base class."""
-        logger.info("LOOKING AT {}".format(os.path.join(data_dir, "train.tsv")))
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
+    if is_training and lines[0][-1] != 'label':
+        raise ValueError(
+            "For training, the input file must contain a label column."
+        )
 
-    def get_dev_examples(self, data_dir):
-        """See base class."""
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "dev.tsv")), "dev")
+    examples = [
+        SwagExample(
+            swag_id = line[2],
+            context_sentence = line[4],
+            start_ending = line[5], # in the swag dataset, the
+                                         # common beginning of each
+                                         # choice is stored in "sent2".
+            ending_0 = line[7],
+            ending_1 = line[8],
+            ending_2 = line[9],
+            ending_3 = line[10],
+            label = int(line[11]) if is_training else None
+        ) for line in lines[1:] # we skip the line with the column names
+    ]
 
-    def get_labels(self):
-        """See base class."""
-        return ["0", "1"]
+    return examples
 
-    def _create_examples(self, lines, set_type):
-        """Creates examples for the training and dev sets."""
-        examples = []
-        for (i, line) in enumerate(lines):
-            if i == 0:
-                continue
-            guid = "%s-%s" % (set_type, i)
-            text_a = line[3]
-            text_b = line[4]
-            label = line[0]
-            examples.append(
-                InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
-        return examples
-
-
-class MnliProcessor(DataProcessor):
-    """Processor for the MultiNLI data set (GLUE version)."""
-
-    def get_train_examples(self, data_dir):
-        """See base class."""
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
-
-    def get_dev_examples(self, data_dir):
-        """See base class."""
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "dev_matched.tsv")),
-            "dev_matched")
-
-    def get_labels(self):
-        """See base class."""
-        return ["contradiction", "entailment", "neutral"]
-
-    def _create_examples(self, lines, set_type):
-        """Creates examples for the training and dev sets."""
-        examples = []
-        for (i, line) in enumerate(lines):
-            if i == 0:
-                continue
-            guid = "%s-%s" % (set_type, line[0])
-            text_a = line[8]
-            text_b = line[9]
-            label = line[-1]
-            examples.append(
-                InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
-        return examples
-
-
-class ColaProcessor(DataProcessor):
-    """Processor for the CoLA data set (GLUE version)."""
-
-    def get_train_examples(self, data_dir):
-        """See base class."""
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "train.tsv")), "train")
-
-    def get_dev_examples(self, data_dir):
-        """See base class."""
-        return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "dev.tsv")), "dev")
-
-    def get_labels(self):
-        """See base class."""
-        return ["0", "1"]
-
-    def _create_examples(self, lines, set_type):
-        """Creates examples for the training and dev sets."""
-        examples = []
-        for (i, line) in enumerate(lines):
-            guid = "%s-%s" % (set_type, i)
-            text_a = line[3]
-            label = line[1]
-            examples.append(
-                InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
-        return examples
-
-
-def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer):
+def convert_examples_to_features(examples, tokenizer, max_seq_length,
+                                 is_training):
     """Loads a data file into a list of `InputBatch`s."""
 
-    label_map = {label : i for i, label in enumerate(label_list)}
-
+    # Swag is a multiple choice task. To perform this task using Bert,
+    # we will use the formatting proposed in "Improving Language
+    # Understanding by Generative Pre-Training" and suggested by
+    # @jacobdevlin-google in this issue
+    # https://github.com/google-research/bert/issues/38.
+    #
+    # Each choice will correspond to a sample on which we run the
+    # inference. For a given Swag example, we will create the 4
+    # following inputs:
+    # - [CLS] context [SEP] choice_1 [SEP]
+    # - [CLS] context [SEP] choice_2 [SEP]
+    # - [CLS] context [SEP] choice_3 [SEP]
+    # - [CLS] context [SEP] choice_4 [SEP]
+    # The model will output a single value for each input. To get the
+    # final decision of the model, we will run a softmax over these 4
+    # outputs.
     features = []
-    for (ex_index, example) in enumerate(examples):
-        tokens_a = tokenizer.tokenize(example.text_a)
+    for example_index, example in enumerate(examples):
+        context_tokens = tokenizer.tokenize(example.context_sentence)
+        start_ending_tokens = tokenizer.tokenize(example.start_ending)
 
-        tokens_b = None
-        if example.text_b:
-            tokens_b = tokenizer.tokenize(example.text_b)
-            # Modifies `tokens_a` and `tokens_b` in place so that the total
-            # length is less than the specified length.
-            # Account for [CLS], [SEP], [SEP] with "- 3"
-            _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
-        else:
-            # Account for [CLS] and [SEP] with "- 2"
-            if len(tokens_a) > max_seq_length - 2:
-                tokens_a = tokens_a[:(max_seq_length - 2)]
+        choices_features = []
+        for ending_index, ending in enumerate(example.endings):
+            # We create a copy of the context tokens in order to be
+            # able to shrink it according to ending_tokens
+            context_tokens_choice = context_tokens[:]
+            ending_tokens = start_ending_tokens + tokenizer.tokenize(ending)
+            # Modifies `context_tokens_choice` and `ending_tokens` in
+            # place so that the total length is less than the
+            # specified length.  Account for [CLS], [SEP], [SEP] with
+            # "- 3"
+            _truncate_seq_pair(context_tokens_choice, ending_tokens, max_seq_length - 3)
 
-        # The convention in BERT is:
-        # (a) For sequence pairs:
-        #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-        #  type_ids: 0   0  0    0    0     0       0 0    1  1  1  1   1 1
-        # (b) For single sequences:
-        #  tokens:   [CLS] the dog is hairy . [SEP]
-        #  type_ids: 0   0   0   0  0     0 0
-        #
-        # Where "type_ids" are used to indicate whether this is the first
-        # sequence or the second sequence. The embedding vectors for `type=0` and
-        # `type=1` were learned during pre-training and are added to the wordpiece
-        # embedding vector (and position vector). This is not *strictly* necessary
-        # since the [SEP] token unambigiously separates the sequences, but it makes
-        # it easier for the model to learn the concept of sequences.
-        #
-        # For classification tasks, the first vector (corresponding to [CLS]) is
-        # used as as the "sentence vector". Note that this only makes sense because
-        # the entire model is fine-tuned.
-        tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
-        segment_ids = [0] * len(tokens)
+            tokens = ["[CLS]"] + context_tokens_choice + ["[SEP]"] + ending_tokens + ["[SEP]"]
+            segment_ids = [0] * (len(context_tokens_choice) + 2) + [1] * (len(ending_tokens) + 1)
 
-        if tokens_b:
-            tokens += tokens_b + ["[SEP]"]
-            segment_ids += [1] * (len(tokens_b) + 1)
+            input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            input_mask = [1] * len(input_ids)
 
-        input_ids = tokenizer.convert_tokens_to_ids(tokens)
+            # Zero-pad up to the sequence length.
+            padding = [0] * (max_seq_length - len(input_ids))
+            input_ids += padding
+            input_mask += padding
+            segment_ids += padding
 
-        # The mask has 1 for real tokens and 0 for padding tokens. Only real
-        # tokens are attended to.
-        input_mask = [1] * len(input_ids)
+            assert len(input_ids) == max_seq_length
+            assert len(input_mask) == max_seq_length
+            assert len(segment_ids) == max_seq_length
 
-        # Zero-pad up to the sequence length.
-        padding = [0] * (max_seq_length - len(input_ids))
-        input_ids += padding
-        input_mask += padding
-        segment_ids += padding
+            choices_features.append((tokens, input_ids, input_mask, segment_ids))
 
-        assert len(input_ids) == max_seq_length
-        assert len(input_mask) == max_seq_length
-        assert len(segment_ids) == max_seq_length
-
-        label_id = label_map[example.label]
-        if ex_index < 5:
+        label = example.label
+        if example_index < 5:
             logger.info("*** Example ***")
-            logger.info("guid: %s" % (example.guid))
-            logger.info("tokens: %s" % " ".join(
-                    [str(x) for x in tokens]))
-            logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-            logger.info(
-                    "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-            logger.info("label: %s (id = %d)" % (example.label, label_id))
+            logger.info(f"swag_id: {example.swag_id}")
+            for choice_idx, (tokens, input_ids, input_mask, segment_ids) in enumerate(choices_features):
+                logger.info(f"choice: {choice_idx}")
+                logger.info(f"tokens: {' '.join(tokens)}")
+                logger.info(f"input_ids: {' '.join(map(str, input_ids))}")
+                logger.info(f"input_mask: {' '.join(map(str, input_mask))}")
+                logger.info(f"segment_ids: {' '.join(map(str, segment_ids))}")
+            if is_training:
+                logger.info(f"label: {label}")
 
         features.append(
-                InputFeatures(input_ids=input_ids,
-                              input_mask=input_mask,
-                              segment_ids=segment_ids,
-                              label_id=label_id))
-    return features
+            InputFeatures(
+                example_id = example.swag_id,
+                choices_features = choices_features,
+                label = label
+            )
+        )
 
+    return features
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
     """Truncates a sequence pair in place to the maximum length."""
@@ -296,6 +224,15 @@ def accuracy(out, labels):
     outputs = np.argmax(out, axis=1)
     return np.sum(outputs == labels)
 
+def select_field(features, field):
+    return [
+        [
+            choice[field]
+            for choice in feature.choices_features
+        ]
+        for feature in features
+    ]
+
 def warmup_linear(x, warmup=0.002):
     if x < warmup:
         return x/warmup
@@ -309,21 +246,16 @@ def main():
                         default=None,
                         type=str,
                         required=True,
-                        help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
+                        help="The input data dir. Should contain the .csv files (or other data files) for the task.")
     parser.add_argument("--bert_model", default=None, type=str, required=True,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                         "bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased, "
                         "bert-base-multilingual-cased, bert-base-chinese.")
-    parser.add_argument("--task_name",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The name of the task to train.")
     parser.add_argument("--output_dir",
                         default=None,
                         type=str,
                         required=True,
-                        help="The output directory where the model predictions and checkpoints will be written.")
+                        help="The output directory where the model checkpoints will be written.")
 
     ## Other parameters
     parser.add_argument("--max_seq_length",
@@ -388,18 +320,6 @@ def main():
 
     args = parser.parse_args()
 
-    processors = {
-        "cola": ColaProcessor,
-        "mnli": MnliProcessor,
-        "mrpc": MrpcProcessor,
-    }
-
-    num_labels_task = {
-        "cola": 2,
-        "mnli": 3,
-        "mrpc": 2,
-    }
-
     if args.local_rank == -1 or args.no_cuda:
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         n_gpu = torch.cuda.device_count()
@@ -427,32 +347,23 @@ def main():
     if not args.do_train and not args.do_eval:
         raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
-    if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train:
+    if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
         raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
     os.makedirs(args.output_dir, exist_ok=True)
-
-    task_name = args.task_name.lower()
-
-    if task_name not in processors:
-        raise ValueError("Task not found: %s" % (task_name))
-
-    processor = processors[task_name]()
-    num_labels = num_labels_task[task_name]
-    label_list = processor.get_labels()
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
 
     train_examples = None
     num_train_steps = None
     if args.do_train:
-        train_examples = processor.get_train_examples(args.data_dir)
+        train_examples = read_swag_examples(os.path.join(args.data_dir, 'train.csv'), is_training = True)
         num_train_steps = int(
             len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
     # Prepare model
-    model = BertForSequenceClassification.from_pretrained(args.bert_model,
-              cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(args.local_rank),
-              num_labels = num_labels)
+    model = BertForMultipleChoice.from_pretrained(args.bert_model,
+        cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(args.local_rank),
+        num_choices=4)
     if args.fp16:
         model.half()
     model.to(device)
@@ -468,6 +379,11 @@ def main():
 
     # Prepare optimizer
     param_optimizer = list(model.named_parameters())
+
+    # hack to remove pooler, which is not used
+    # thus it produce None grad that break apex
+    param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
@@ -491,7 +407,6 @@ def main():
             optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
         else:
             optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-
     else:
         optimizer = BertAdam(optimizer_grouped_parameters,
                              lr=args.learning_rate,
@@ -499,20 +414,18 @@ def main():
                              t_total=t_total)
 
     global_step = 0
-    nb_tr_steps = 0
-    tr_loss = 0
     if args.do_train:
         train_features = convert_examples_to_features(
-            train_examples, label_list, args.max_seq_length, tokenizer)
+            train_examples, tokenizer, args.max_seq_length, True)
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
         logger.info("  Num steps = %d", num_train_steps)
-        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
-        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        all_input_ids = torch.tensor(select_field(train_features, 'input_ids'), dtype=torch.long)
+        all_input_mask = torch.tensor(select_field(train_features, 'input_mask'), dtype=torch.long)
+        all_segment_ids = torch.tensor(select_field(train_features, 'segment_ids'), dtype=torch.long)
+        all_label = torch.tensor([f.label for f in train_features], dtype=torch.long)
+        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label)
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_data)
         else:
@@ -529,17 +442,20 @@ def main():
                 loss = model(input_ids, segment_ids, input_mask, label_ids)
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
+                if args.fp16 and args.loss_scale != 1.0:
+                    # rescale loss for fp16 training
+                    # see https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html
+                    loss = loss * args.loss_scale
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
+                tr_loss += loss.item()
+                nb_tr_examples += input_ids.size(0)
+                nb_tr_steps += 1
 
                 if args.fp16:
                     optimizer.backward(loss)
                 else:
                     loss.backward()
-
-                tr_loss += loss.item()
-                nb_tr_examples += input_ids.size(0)
-                nb_tr_steps += 1
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     # modify learning rate with special warm up BERT uses
                     lr_this_step = args.learning_rate * warmup_linear(global_step/t_total, args.warmup_proportion)
@@ -552,26 +468,27 @@ def main():
     # Save a trained model
     model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
     output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-    if args.do_train:
-        torch.save(model_to_save.state_dict(), output_model_file)
+    torch.save(model_to_save.state_dict(), output_model_file)
 
     # Load a trained model that you have fine-tuned
     model_state_dict = torch.load(output_model_file)
-    model = BertForSequenceClassification.from_pretrained(args.bert_model, state_dict=model_state_dict, num_labels=num_labels)
+    model = BertForMultipleChoice.from_pretrained(args.bert_model,
+        state_dict=model_state_dict,
+        num_choices=4)
     model.to(device)
 
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        eval_examples = processor.get_dev_examples(args.data_dir)
+        eval_examples = read_swag_examples(os.path.join(args.data_dir, 'val.csv'), is_training = True)
         eval_features = convert_examples_to_features(
-            eval_examples, label_list, args.max_seq_length, tokenizer)
+            eval_examples, tokenizer, args.max_seq_length, True)
         logger.info("***** Running evaluation *****")
         logger.info("  Num examples = %d", len(eval_examples))
         logger.info("  Batch size = %d", args.eval_batch_size)
-        all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-        all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
-        eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        all_input_ids = torch.tensor(select_field(eval_features, 'input_ids'), dtype=torch.long)
+        all_input_mask = torch.tensor(select_field(eval_features, 'input_mask'), dtype=torch.long)
+        all_segment_ids = torch.tensor(select_field(eval_features, 'segment_ids'), dtype=torch.long)
+        all_label = torch.tensor([f.label for f in eval_features], dtype=torch.long)
+        eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label)
         # Run prediction for full data
         eval_sampler = SequentialSampler(eval_data)
         eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.eval_batch_size)
@@ -579,8 +496,7 @@ def main():
         model.eval()
         eval_loss, eval_accuracy = 0, 0
         nb_eval_steps, nb_eval_examples = 0, 0
- 
-        for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
+        for input_ids, input_mask, segment_ids, label_ids in eval_dataloader:
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
             segment_ids = segment_ids.to(device)
@@ -602,11 +518,11 @@ def main():
 
         eval_loss = eval_loss / nb_eval_steps
         eval_accuracy = eval_accuracy / nb_eval_examples
-        loss = tr_loss/nb_tr_steps if args.do_train else None
+
         result = {'eval_loss': eval_loss,
                   'eval_accuracy': eval_accuracy,
                   'global_step': global_step,
-                  'loss': loss}
+                  'loss': tr_loss/nb_tr_steps}
 
         output_eval_file = os.path.join(args.output_dir, "eval_results.txt")
         with open(output_eval_file, "w") as writer:
@@ -614,6 +530,7 @@ def main():
             for key in sorted(result.keys()):
                 logger.info("  %s = %s", key, str(result[key]))
                 writer.write("%s = %s\n" % (key, str(result[key])))
+
 
 if __name__ == "__main__":
     main()
