@@ -9,7 +9,7 @@ tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 model = BertForMaskedLM.from_pretrained('bert-base-uncased')
 model.eval()
 
-with open("../squad2/data/dev-v2.0.json", 'r') as handle:
+with open("../Squad2Generative/data/dev-v2.0.json", 'r') as handle:
     jdata = json.load(handle)
     data = jdata['data']
 
@@ -46,16 +46,17 @@ for i in range(len(data)):
         for j in range(len(qas)):
             question = qas[j]['question']
             label = qas[j]['is_impossible']
-            prob = calc_prob(context, question)
+            try:
+                prob = calc_prob(context, question)
+            except:
+                continue
             if label:
                 unanswerable_probs.append(prob)
             else:
                 answerable_probs.append(prob)
             counter += 1
-            if counter % 10 == 0:
+            if counter % 100 == 0:
                 print("Processed ", counter)
-        break
-    break
 
 with open("./results.pkl", "wb") as handle:
     pickle.dump((answerable_probs, unanswerable_probs), handle)
