@@ -123,3 +123,6 @@ tensorflow_code
 
 # Daniter new
 .idea/
+dataset/
+models/
+
