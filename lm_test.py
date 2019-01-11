@@ -33,6 +33,7 @@ def calc_prob(context, question):
     q_len = len(indexed_mask_tokens)
     for i in range(q_len):
         total += predictions[0,context_len+i,gt_indexed_q_tokens[i]].item()
+        # TODO DANITER - better normalization
     return total
 
 answerable_probs = []
