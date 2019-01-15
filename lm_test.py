@@ -1,6 +1,7 @@
 import torch
 import json
 import pickle
+import numpy as np
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 
 # Load pre-trained model tokenizer (vocabulary)
@@ -18,23 +19,25 @@ def calc_prob(context, question):
     gt_q_tokens = tokenizer.tokenize(gt_question)
     gt_indexed_q_tokens = tokenizer.convert_tokens_to_ids(gt_q_tokens)
     
-    mask_tokens = ["[MASK]"]*len(gt_indexed_q_tokens)
-    indexed_mask_tokens = tokenizer.convert_tokens_to_ids(mask_tokens)
+    # mask_tokens = ["[MASK]"]*len(gt_indexed_q_tokens)
+    # indexed_mask_tokens = tokenizer.convert_tokens_to_ids(mask_tokens)
     
     context_tokens = tokenizer.tokenize(context)
     indexed_context_tokens = tokenizer.convert_tokens_to_ids(context_tokens)
     
-    tokens_tensor = torch.tensor([indexed_context_tokens + indexed_mask_tokens])
-    segments_tensors = torch.tensor([0]*len(indexed_context_tokens) + [1]*len(indexed_mask_tokens))
+    tokens_tensor = torch.tensor([indexed_context_tokens + gt_indexed_q_tokens])
+    segments_tensors = torch.tensor([0]*len(indexed_context_tokens) + [1]*len(gt_indexed_q_tokens))
     predictions = model(tokens_tensor, segments_tensors)
     
     total = 0
     context_len = len(context_tokens)
-    q_len = len(indexed_mask_tokens)
+    q_len = len(gt_indexed_q_tokens)
     for i in range(q_len):
-        total += predictions[0,context_len+i,gt_indexed_q_tokens[i]].item()
-        # TODO DANITER - better normalization
-    return total
+        preds = predictions[0, context_len + i].data.numpy()
+        total += -np.log(np.exp(preds[gt_indexed_q_tokens[i]]) / sum(np.exp(preds)))
+    entropy = total / q_len
+    perplexity = np.exp(entropy)
+    return perplexity
 
 answerable_probs = []
 unanswerable_probs = []
