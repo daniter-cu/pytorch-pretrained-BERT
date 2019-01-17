@@ -75,8 +75,6 @@ class BERTDataset(Dataset):
                         self.questions.append(question)
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
                     # TODO DANITER : get rid of these breaks they are for debug
-                    break
-                break
 
         # load samples later lazily from disk
         else:
