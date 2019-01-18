@@ -9,7 +9,7 @@ from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 
 def main(args):
     # Load pre-trained model tokenizer (vocabulary)
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
 
     model = BertForMaskedLM.from_pretrained(args.model)
     model.eval()

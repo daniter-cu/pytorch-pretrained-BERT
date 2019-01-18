@@ -74,7 +74,6 @@ class BERTDataset(Dataset):
                             continue
                         self.questions.append(question)
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
-                    # TODO DANITER : get rid of these breaks they are for debug
 
         # load samples later lazily from disk
         else:
@@ -102,11 +101,11 @@ class BERTDataset(Dataset):
         # transform sample to features
         cur_features = convert_example_to_features(cur_example, self.seq_len, self.tokenizer)
 
-        cur_tensors = {"input_ids": torch.tensor(cur_features.input_ids),
-                       "input_mask": torch.tensor(cur_features.input_mask),
-                       "segment_ids": torch.tensor(cur_features.segment_ids),
-                       "lm_label_ids": torch.tensor(cur_features.lm_label_ids),
-                       "is_next": torch.tensor(cur_features.is_next)}
+        cur_tensors = (torch.tensor(cur_features.input_ids),
+                       torch.tensor(cur_features.input_mask),
+                       torch.tensor(cur_features.segment_ids),
+                       torch.tensor(cur_features.lm_label_ids),
+                       torch.tensor(cur_features.is_next))
 
         return cur_tensors
 
@@ -369,6 +368,9 @@ def main():
                         action='store_true',
                         default=True,
                         help="Whether to load train samples into memory or use disk")
+    parser.add_argument("--do_lower_case",
+                        action='store_true',
+                        help="Whether to lower case the input text. True for uncased models, False for cased models.")
     parser.add_argument("--local_rank",
                         type=int,
                         default=-1,
@@ -389,6 +391,10 @@ def main():
                         help = "Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
                         "0 (default value): dynamic loss scaling.\n"
                         "Positive power of 2: static loss scaling value.\n")
+    parser.add_argument("--test_run",
+                        action='store_true',
+                        default=False,
+                        help="If true, shortcut the input data.")
 
     args = parser.parse_args()
 
@@ -497,7 +503,7 @@ def main():
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
-                batch = tuple(t.to(device) for t in batch.values())
+                batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, segment_ids, lm_label_ids, is_next = batch
                 loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
                 if n_gpu > 1:
@@ -519,13 +525,21 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
+                    if args.test_run and global_step == 20:
+                        logger.info("** ** * Saving fine - tuned model ** ** * ")
+                        model_to_save = model.module if hasattr(model,
+                                                                'module') else model  # Only save the model it-self
+                        output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
+                        if args.do_train:
+                            torch.save(model_to_save.state_dict(), output_model_file)
+                        return
 
+        # Save a trained model
         logger.info("** ** * Saving fine - tuned model ** ** * ")
+        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
         output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-        if n_gpu > 1:
-            torch.save(model.module.bert.state_dict(), output_model_file)
-        else:
-            torch.save(model.bert.state_dict(), output_model_file)
+        if args.do_train:
+            torch.save(model_to_save.state_dict(), output_model_file)
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
