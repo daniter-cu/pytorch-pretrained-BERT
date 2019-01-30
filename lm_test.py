@@ -10,8 +10,9 @@ from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 def main(args):
     # Load pre-trained model tokenizer (vocabulary)
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
-
-    model = BertForMaskedLM.from_pretrained(args.model)
+    
+    model_state_dict = torch.load(args.model)
+    model = BertForMaskedLM.from_pretrained('bert-base-uncased', state_dict=model_state_dict)
     model.eval()
 
     with open(args.squad, 'r') as handle:
