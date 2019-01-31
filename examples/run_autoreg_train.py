@@ -611,8 +611,9 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                    print("Current Loss: ", tr_loss)
-                    tr_loss = 0
+                    if global_step % 10 == 0:
+                        print("Current Loss: ", tr_loss)
+                        tr_loss = 0
 
                 # eval
                 if global_step % 20 == 0:
