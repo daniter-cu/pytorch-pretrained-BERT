@@ -1,0 +1,8 @@
+nlprun -g 1 -a dan-pytorch -o 1l.out "sh dan_run_1_lowlr.sh"
+nlprun -g 1 -a dan-pytorch -o 2l.out "sh dan_run_2_lowlr.sh"
+nlprun -g 1 -a dan-pytorch -o 3l.out "sh dan_run_3_lowlr.sh"
+nlprun -g 1 -a dan-pytorch -o 1.out "sh dan_run_1.sh"
+nlprun -g 1 -a dan-pytorch -o 2.out "sh dan_run_2.sh"
+nlprun -g 1 -a dan-pytorch -o 3.out "sh dan_run_3.sh"
+nlprun -g 1 -a dan-pytorch -o short.out "sh dan_run_shorter.sh"
+nlprun -g 1 -a dan-pyhorch -o long.out "sh dan_run_qa_ft.sh"
