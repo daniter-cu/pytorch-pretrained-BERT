@@ -94,7 +94,7 @@ class RNNModel(nn.Module):
                                     output_all_encoded_layers=False)
         output, hidden = self.rnn(emb, hidden.unsqueeze(0))
         #output = self.drop(output) # todo daniter: probably put back dropout
-        if self.ngpu > 0:
+        if self.ngpu > 10:
             decoded = self.decoder(output.view(-1, output.size(2)))
         else:
             decoded = self.decoder(output.contiguous().view(-1, output.size(2)))
@@ -525,11 +525,14 @@ def main():
     print("Checking the vocab size:", len(tokenizer.vocab))
     # 768 is bert hidden size, 256 is GRU hidden size, 1 is the layers in the GRU
     model = RNNModel("GRU", len(tokenizer.vocab), 768, 768, 1, context_model, question_model, ngpu=n_gpu)
+    model.to(device)
     param_optimizer = list(model.named_parameters())
+    print(param_optimizer)
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay) and "bert" in n], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay) and "bert" in n], 'weight_decay': 0.0},
+        {'params': [p for n, p in param_optimizer if "bert" not in n]}
         ]
 
     optimizer = BertAdam(optimizer_grouped_parameters,
@@ -577,10 +580,15 @@ def main():
                     # modify learning rate with special warm up BERT uses
                     lr_this_step = args.learning_rate * warmup_linear(global_step/num_train_steps, args.warmup_proportion)
                     for param_group in optimizer.param_groups:
-                        param_group['lr'] = lr_this_step
+                        if len(param_group['params']) < 10:
+                            param_group['lr'] = lr_this_step * 100
+                            print("small group")
+                        else:
+                            param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
+                    print("Current Loss: ", tr_loss)
                     if args.test_run and global_step == 20:
                         logger.info("** ** * Saving fine - tuned model ** ** * ")
                         model_to_save = model.module if hasattr(model,
