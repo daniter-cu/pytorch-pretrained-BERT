@@ -589,6 +589,7 @@ def main():
                     optimizer.zero_grad()
                     global_step += 1
                     print("Current Loss: ", tr_loss)
+                    tr_loss = 0
                     if args.test_run and global_step == 20:
                         logger.info("** ** * Saving fine - tuned model ** ** * ")
                         model_to_save = model.module if hasattr(model,
