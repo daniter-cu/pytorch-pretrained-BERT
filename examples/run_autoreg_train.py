@@ -16,7 +16,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
@@ -110,7 +110,8 @@ class RNNModel(nn.Module):
 
 
 class BERTDataset(Dataset):
-    def __init__(self, corpus_path, tokenizer, seq_len, encoding="utf-8", on_memory=True):
+    def __init__(self, corpus_path, tokenizer, seq_len, encoding="utf-8", on_memory=True, answerable=True):
+        self.use_answerable = answerable
         self.vocab = tokenizer.vocab
         self.tokenizer = tokenizer
         self.seq_len = seq_len
@@ -143,7 +144,9 @@ class BERTDataset(Dataset):
                     for j in range(len(qas)):
                         question = qas[j]['question']
                         unanswerable = qas[j]['is_impossible']
-                        if unanswerable:
+                        if self.use_answerable and unanswerable:
+                            continue
+                        if not self.use_answerable and not unanswerable:
                             continue
                         self.questions.append(question)
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
@@ -386,6 +389,11 @@ def main():
                         type=str,
                         required=True,
                         help="The input train corpus.")
+    parser.add_argument("--eval_file",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="The input eval corpus.")
     parser.add_argument("--bert_model", default=None, type=str, required=True,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                              "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
@@ -505,6 +513,12 @@ def main():
         num_train_steps = int(
             len(train_dataset) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
+    # Load eval_data
+    eval_dataset_answerable = BERTDataset(args.eval_file, tokenizer, seq_len=args.max_seq_length,
+                                on_memory=args.on_memory, answerable=True)
+    eval_dataset_unanswerable = BERTDataset(args.eval_file, tokenizer, seq_len=args.max_seq_length,
+                               on_memory=args.on_memory, answerable=False)
+
     # Prepare model
     context_model = BertModel.from_pretrained(args.bert_model)# BertForPreTraining.from_pretrained(args.bert_model)
     question_model = BertModel.from_pretrained(args.bert_model)
@@ -555,6 +569,16 @@ def main():
             train_sampler = DistributedSampler(train_dataset)
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
 
+        # eval loader
+        eval_sampler_ans = SequentialSampler(eval_dataset_answerable)
+        eval_dataloader_ans = DataLoader(eval_dataset_answerable, sampler=eval_sampler_ans,
+                                         batch_size=args.train_batch_size)
+        eval_sampler_unans = SequentialSampler(eval_dataset_unanswerable)
+        eval_dataloader_unans = DataLoader(eval_dataset_unanswerable, sampler=eval_sampler_unans,
+                                           batch_size=args.train_batch_size)
+
+
+
         model.train()
         criterion = nn.CrossEntropyLoss()#len(tokenizer.vocab))
         model.init_hidden(args.train_batch_size)
@@ -582,7 +606,6 @@ def main():
                     for param_group in optimizer.param_groups:
                         if len(param_group['params']) < 10:
                             param_group['lr'] = lr_this_step * 100
-                            print("small group")
                         else:
                             param_group['lr'] = lr_this_step
                     optimizer.step()
@@ -590,6 +613,35 @@ def main():
                     global_step += 1
                     print("Current Loss: ", tr_loss)
                     tr_loss = 0
+
+                # eval
+                if global_step % 20 == 0:
+                    model.eval()
+                    eval_loss_ans = 0
+                    for batch_i, eval_batch in enumerate(eval_dataloader_ans):
+                        if batch_i > 10:
+                            break
+                        eval_batch = tuple(t.to(device) for t in eval_batch)
+                        question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                        output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                        loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                        eval_loss_ans += loss.item()
+                    print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
+
+                    eval_loss_unans = 0
+                    for batch_i, eval_batch in enumerate(eval_dataloader_unans):
+                        if batch_i > 10:
+                            break
+                        eval_batch = tuple(t.to(device) for t in eval_batch)
+                        question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                        output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                        loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                        eval_loss_unans += loss.item()
+                    print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
+                    model.train()
+
+
+
                     if args.test_run and global_step == 20:
                         logger.info("** ** * Saving fine - tuned model ** ** * ")
                         model_to_save = model.module if hasattr(model,

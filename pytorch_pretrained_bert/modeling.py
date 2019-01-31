@@ -508,7 +508,8 @@ class PreTrainedBertModel(nn.Module):
         model = cls(config, *inputs, **kwargs)
         if state_dict is None:
             weights_path = os.path.join(serialization_dir, WEIGHTS_NAME)
-            state_dict = torch.load(weights_path)
+            # DANITER undo
+            state_dict = torch.load(weights_path, map_location=lambda storage, loc: storage)
 
         old_keys = []
         new_keys = []
