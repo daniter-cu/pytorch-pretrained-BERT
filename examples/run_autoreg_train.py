@@ -617,29 +617,30 @@ def main():
 
                 # eval
                 if global_step % 20 == 0:
-                    model.eval()
-                    eval_loss_ans = 0
-                    for batch_i, eval_batch in enumerate(eval_dataloader_ans):
-                        if batch_i > 10:
-                            break
-                        eval_batch = tuple(t.to(device) for t in eval_batch)
-                        question_ids, question_mask, context_ids, context_mask, targets = eval_batch
-                        output, _ = model(context_ids, context_mask, question_ids, question_mask)
-                        loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
-                        eval_loss_ans += loss.item()
-                    print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
+                    with torch.no_grad():
+                        model.eval()
+                        eval_loss_ans = 0
+                        for batch_i, eval_batch in enumerate(eval_dataloader_ans):
+                            if batch_i > 40:
+                                break
+                            eval_batch = tuple(t.to(device) for t in eval_batch)
+                            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                            output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                            loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                            eval_loss_ans += loss.item()
+                        print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
 
-                    eval_loss_unans = 0
-                    for batch_i, eval_batch in enumerate(eval_dataloader_unans):
-                        if batch_i > 10:
-                            break
-                        eval_batch = tuple(t.to(device) for t in eval_batch)
-                        question_ids, question_mask, context_ids, context_mask, targets = eval_batch
-                        output, _ = model(context_ids, context_mask, question_ids, question_mask)
-                        loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
-                        eval_loss_unans += loss.item()
-                    print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
-                    model.train()
+                        eval_loss_unans = 0
+                        for batch_i, eval_batch in enumerate(eval_dataloader_unans):
+                            if batch_i > 40:
+                                break
+                            eval_batch = tuple(t.to(device) for t in eval_batch)
+                            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                            output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                            loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                            eval_loss_unans += loss.item()
+                        print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
+                        model.train()
 
 
 

@@ -1,0 +1,8 @@
+nlprun -g 1 -a dan-pytorch -o 1.out "python lm_test.py --model models_1/pytorch_model.bin --output probs_1"
+nlprun -g 1 -a dan-pytorch -o 2.out "python lm_test.py --model     models_2/pytorch_model.bin --output probs_2"
+nlprun -g 1 -a dan-pytorch -o 3.out "python lm_test.py --model     models_3/pytorch_model.bin --output probs_3"
+nlprun -g 1 -a dan-pytorch -o 1l.out "python lm_test.py --model    models_1l/pytorch_model.bin --output probs_1l"
+nlprun -g 1 -a dan-pytorch -o 2l.out "python lm_test.py --model    models_2l/pytorch_model.bin --output probs_2l"
+nlprun -g 1 -a dan-pytorch -o 3l.out "python lm_test.py --model    models_3l/pytorch_model.bin --output probs_3l"
+nlprun -g 1 -a dan-pytorch -o short.out "python lm_test.py --model    models_short/pytorch_model.bin --output probs_short"
+#nlprun -g 1 -a dan-pytorch -o long.out "python lm_test.py --model    models_1/pytorch_model.bin --output probs_1"
