@@ -368,13 +368,13 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     assert len(context_ids) == max_seq_length
     assert len(context_mask) == max_seq_length
 
-    if example.guid < 5:
-        logger.info("*** Example ***")
-        logger.info("guid: %s" % (example.guid))
-        logger.info("tokens: %s" % " ".join(
-                [str(x) for x in question_tokens]))
-        logger.info("input_ids: %s" % " ".join([str(x) for x in question_ids]))
-        logger.info("input_mask: %s" % " ".join([str(x) for x in question_mask]))
+    # if example.guid < 5:
+    #     logger.info("*** Example ***")
+    #     logger.info("guid: %s" % (example.guid))
+    #     logger.info("tokens: %s" % " ".join(
+    #             [str(x) for x in question_tokens]))
+    #     logger.info("input_ids: %s" % " ".join([str(x) for x in question_ids]))
+    #     logger.info("input_mask: %s" % " ".join([str(x) for x in question_mask]))
 
     features = InputFeatures(context_ids, context_mask, question_ids, question_mask, targets)
     return features
