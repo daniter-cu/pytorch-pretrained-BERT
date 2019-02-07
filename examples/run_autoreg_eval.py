@@ -491,7 +491,7 @@ def main():
         raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
     os.makedirs(args.output_dir, exist_ok=True)
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
 
     # Load eval_data
     eval_dataset_answerable = BERTDataset(args.eval_file, tokenizer, seq_len=args.max_seq_length,
