@@ -547,7 +547,6 @@ def main():
             eids = eval_batch[-1]
             eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
             question_ids, question_mask, context_ids, context_mask, targets = eval_batch
-            print("#### DANITER : EIDS", eids)
             output, _ = model(context_ids, context_mask, question_ids, question_mask)
             loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
             print(loss)
