@@ -505,6 +505,7 @@ def main():
 
     # Prepare model
     model_state_dict = torch.load(args.bert_model)
+    ## TODO daniter: check if bert model is being loaded correctly
     context_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
     question_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
     context_model.to(device)
