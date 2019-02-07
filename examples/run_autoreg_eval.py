@@ -11,6 +11,7 @@ import logging
 import argparse
 import json
 from tqdm import tqdm, trange
+import csv
 
 import numpy as np
 import torch
@@ -401,6 +402,11 @@ def main():
                         type=str,
                         required=True,
                         help="The output directory where the model checkpoints will be written.")
+    parser.add_argument("--output_file",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="The output file where the scores will be written.")
 
     ## Other parameters
     parser.add_argument("--max_seq_length",
@@ -541,31 +547,30 @@ def main():
     model.init_hidden(args.train_batch_size)
     with torch.no_grad():
         model.eval()
-        eval_loss_ans = 0
-        for batch_i, eval_batch in enumerate(eval_dataloader_ans):
-            if batch_i > 40:
-                break
-            eids = eval_batch[-1]
-            eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
-            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
-            output, _ = model(context_ids, context_mask, question_ids, question_mask)
-            loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
-            print(eids, loss.item())
-            eval_loss_ans += loss.item()
-        print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
+        with open(args.output_file, "w") as handle:
+            loss_writer = csv.writer(handle, delimiter=',')
 
-        eval_loss_unans = 0
-        for batch_i, eval_batch in enumerate(eval_dataloader_unans):
-            if batch_i > 40:
-                break
-            eids = eval_batch[-1]
-            eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
-            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
-            output, _ = model(context_ids, context_mask, question_ids, question_mask)
-            loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
-            print(eids, loss.item())
-            eval_loss_unans += loss.item()
-        print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
+            eval_loss_ans = 0
+            for batch_i, eval_batch in enumerate(eval_dataloader_ans):
+                eids = eval_batch[-1]
+                eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
+                question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                loss_writer.writerow([eids[0], loss.item(), "ANS"])
+                eval_loss_ans += loss.item()
+            print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
+
+            eval_loss_unans = 0
+            for batch_i, eval_batch in enumerate(eval_dataloader_unans):
+                eids = eval_batch[-1]
+                eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
+                question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+                output, _ = model(context_ids, context_mask, question_ids, question_mask)
+                loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+                loss_writer.writerow([eids[0], loss.item(), "UNANS"])
+                eval_loss_unans += loss.item()
+            print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
 
 
 
