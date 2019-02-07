@@ -552,6 +552,8 @@ def main():
 
             eval_loss_ans = 0
             for batch_i, eval_batch in enumerate(eval_dataloader_ans):
+                if batch_i % 1000 == 0:
+                    print("#### DANITER completed answerable", batch_i)
                 eids = eval_batch[-1]
                 eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
                 question_ids, question_mask, context_ids, context_mask, targets = eval_batch
@@ -563,6 +565,8 @@ def main():
 
             eval_loss_unans = 0
             for batch_i, eval_batch in enumerate(eval_dataloader_unans):
+                if batch_i % 1000 == 0:
+                    print("#### DANITER completed unanswerable", batch_i)
                 eids = eval_batch[-1]
                 eval_batch = tuple(t.to(device) for t in eval_batch[:-1])
                 question_ids, question_mask, context_ids, context_mask, targets = eval_batch
