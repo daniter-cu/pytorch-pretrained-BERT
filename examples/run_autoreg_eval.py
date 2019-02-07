@@ -550,7 +550,7 @@ def main():
             question_ids, question_mask, context_ids, context_mask, targets = eval_batch
             output, _ = model(context_ids, context_mask, question_ids, question_mask)
             loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
-            print(loss)
+            print(eids, loss.item())
             eval_loss_ans += loss.item()
         print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
 
@@ -563,6 +563,7 @@ def main():
             question_ids, question_mask, context_ids, context_mask, targets = eval_batch
             output, _ = model(context_ids, context_mask, question_ids, question_mask)
             loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+            print(eids, loss.item())
             eval_loss_unans += loss.item()
         print("##### DANITER EVAL LOSS IS (UNANSWERABLE) : ", eval_loss_unans)
 
