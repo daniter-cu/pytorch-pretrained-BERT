@@ -582,7 +582,7 @@ def main():
         model.train()
         criterion = nn.CrossEntropyLoss()#len(tokenizer.vocab))
         model.init_hidden(args.train_batch_size)
-        for _ in trange(int(args.num_train_epochs), desc="Epoch"):
+        for epoch_i in trange(int(args.num_train_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
@@ -653,12 +653,12 @@ def main():
                             torch.save(model_to_save.state_dict(), output_model_file)
                         return
 
-        # Save a trained model
-        logger.info("** ** * Saving fine - tuned model ** ** * ")
-        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
-        output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-        if args.do_train:
-            torch.save(model_to_save.state_dict(), output_model_file)
+            # Save a trained model
+            logger.info("** ** * Saving fine - tuned model ** ** * ")
+            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
+            output_model_file = os.path.join(args.output_dir, "pytorch_model"+str(epoch_i) +".bin")
+            if args.do_train:
+                torch.save(model_to_save.state_dict(), output_model_file)
 
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):

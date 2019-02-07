@@ -397,11 +397,6 @@ def main():
     parser.add_argument("--bert_model", default=None, type=str, required=True,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                              "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
-    parser.add_argument("--output_dir",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--output_file",
                         default=None,
                         type=str,
@@ -497,10 +492,6 @@ def main():
     if n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
-    if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
-        raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
-    os.makedirs(args.output_dir, exist_ok=True)
-
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
 
     # Load eval_data
@@ -510,10 +501,10 @@ def main():
                                on_memory=args.on_memory, answerable=False)
 
     # Prepare model
-    model_state_dict = torch.load(args.bert_model)
+    model_state_dict = torch.load(args.bert_model, map_location='cpu') #TODO daniter: remove this map_location
     ## TODO daniter: check if bert model is being loaded correctly
-    context_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
-    question_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
+    context_model = BertModel.from_pretrained("bert-base-uncased")#, state_dict=model_state_dict)
+    question_model = BertModel.from_pretrained("bert-base-uncased")#, state_dict=model_state_dict)
     context_model.to(device)
     question_model.to(device)
     if args.local_rank != -1:
@@ -532,6 +523,8 @@ def main():
     # 768 is bert hidden size, 256 is GRU hidden size, 1 is the layers in the GRU
     model = RNNModel("GRU", len(tokenizer.vocab), 768, 768, 1, context_model, question_model, ngpu=n_gpu)
     model.load_state_dict(model_state_dict)
+    import pdb;
+    pdb.set_trace()
     model.to(device)
 
     # eval loader
