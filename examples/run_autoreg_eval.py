@@ -127,6 +127,7 @@ class BERTDataset(Dataset):
         self.questions = []
         self.contexts = []
         self.examples = []
+        self.example_ids = []
 
         # load samples into memory
         if on_memory:
@@ -144,12 +145,14 @@ class BERTDataset(Dataset):
                     for j in range(len(qas)):
                         question = qas[j]['question']
                         unanswerable = qas[j]['is_impossible']
+                        id = qas[j]['id']
                         if self.use_answerable and unanswerable:
                             continue
                         if not self.use_answerable and not unanswerable:
                             continue
                         self.questions.append(question)
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
+                        self.example_ids.append(id)
 
         # load samples later lazily from disk
         else:
@@ -181,7 +184,8 @@ class BERTDataset(Dataset):
                        torch.tensor(cur_features.question_mask),
                        torch.tensor(cur_features.context_ids),
                        torch.tensor(cur_features.context_mask),
-                       torch.tensor(cur_features.targets))
+                       torch.tensor(cur_features.targets),
+                       self.example_ids[item])
 
         return cur_tensors
 
@@ -541,9 +545,11 @@ def main():
             if batch_i > 40:
                 break
             eval_batch = tuple(t.to(device) for t in eval_batch)
-            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+            question_ids, question_mask, context_ids, context_mask, targets, eids = eval_batch
+            print("#### DANITER : EIDS", eids)
             output, _ = model(context_ids, context_mask, question_ids, question_mask)
             loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
+            print(loss)
             eval_loss_ans += loss.item()
         print("##### DANITER EVAL LOSS IS (ANSWERABLE) : ", eval_loss_ans)
 
@@ -552,7 +558,7 @@ def main():
             if batch_i > 40:
                 break
             eval_batch = tuple(t.to(device) for t in eval_batch)
-            question_ids, question_mask, context_ids, context_mask, targets = eval_batch
+            question_ids, question_mask, context_ids, context_mask, targets, eids = eval_batch
             output, _ = model(context_ids, context_mask, question_ids, question_mask)
             loss = criterion(output.view(-1, len(tokenizer.vocab)), question_ids.view(-1))
             eval_loss_unans += loss.item()
