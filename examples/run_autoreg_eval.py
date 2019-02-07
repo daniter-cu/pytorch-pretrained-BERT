@@ -500,8 +500,9 @@ def main():
                                on_memory=args.on_memory, answerable=False)
 
     # Prepare model
-    context_model = BertModel.from_pretrained(args.bert_model)# BertForPreTraining.from_pretrained(args.bert_model)
-    question_model = BertModel.from_pretrained(args.bert_model)
+    model_state_dict = torch.load(args.model)
+    context_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
+    question_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
     context_model.to(device)
     question_model.to(device)
     if args.local_rank != -1:
@@ -519,6 +520,7 @@ def main():
     print("Checking the vocab size:", len(tokenizer.vocab))
     # 768 is bert hidden size, 256 is GRU hidden size, 1 is the layers in the GRU
     model = RNNModel("GRU", len(tokenizer.vocab), 768, 768, 1, context_model, question_model, ngpu=n_gpu)
+    model.load_state_dict(model_state_dict)
     model.to(device)
 
     # eval loader
