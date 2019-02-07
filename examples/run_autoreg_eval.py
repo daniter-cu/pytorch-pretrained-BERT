@@ -500,7 +500,7 @@ def main():
                                on_memory=args.on_memory, answerable=False)
 
     # Prepare model
-    model_state_dict = torch.load(args.model)
+    model_state_dict = torch.load(args.bert_model)
     context_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
     question_model = BertModel.from_pretrained("bert-base-uncased", state_dict=model_state_dict)
     context_model.to(device)
