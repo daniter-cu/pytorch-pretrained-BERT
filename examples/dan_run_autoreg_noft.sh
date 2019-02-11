@@ -9,5 +9,4 @@ python run_autoreg_train.py \
   --num_train_epochs 2.0 \
   --learning_rate 3e-5 \
   --train_batch_size 16 \
-  --ft_bert \
   --max_seq_length 128 

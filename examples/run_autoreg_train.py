@@ -445,7 +445,7 @@ def main():
                         help="Whether to load train samples into memory or use disk")
     parser.add_argument("--ft_bert",
                         action='store_true',
-                        default=True,
+                        default=False,
                         help="Whether to load train samples into memory or use disk")
     parser.add_argument("--do_lower_case",
                         action='store_true',
