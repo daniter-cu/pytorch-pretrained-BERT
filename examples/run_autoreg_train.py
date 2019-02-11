@@ -349,7 +349,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     # tokens are attended to.
     context_mask = [1] * len(context_ids)
     question_mask = [1] * len(question_ids)
-    targets = list(question_ids)
+    targets = list(question_ids[1:])
 
 
     # Zero-pad up to the sequence length.
@@ -360,7 +360,9 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     while len(question_ids) < max_seq_length:
         question_ids.append(0)
         question_mask.append(0)
-        targets.append(-1)
+
+    while len(targets) < max_seq_length:
+        targets.append(0)
 
     assert len(question_ids) == max_seq_length
     assert len(question_mask) == max_seq_length
@@ -368,7 +370,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     assert len(context_ids) == max_seq_length
     assert len(context_mask) == max_seq_length
 
-    if example.guid < 5:
+    if False:#example.guid < 5:
         logger.info("*** Example ***")
         logger.info("guid: %s" % (example.guid))
         logger.info("tokens: %s" % " ".join(
@@ -438,6 +440,10 @@ def main():
                         action='store_true',
                         help="Whether not to use CUDA when available")
     parser.add_argument("--on_memory",
+                        action='store_true',
+                        default=True,
+                        help="Whether to load train samples into memory or use disk")
+    parser.add_argument("--ft_bert",
                         action='store_true',
                         default=True,
                         help="Whether to load train samples into memory or use disk")
@@ -541,7 +547,7 @@ def main():
     model = RNNModel("GRU", len(tokenizer.vocab), 768, 768, 1, context_model, question_model, ngpu=n_gpu)
     model.to(device)
     param_optimizer = list(model.named_parameters())
-    print(param_optimizer)
+
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay) and "bert" in n], 'weight_decay': 0.01},
@@ -607,7 +613,10 @@ def main():
                         if len(param_group['params']) < 10:
                             param_group['lr'] = lr_this_step * 100
                         else:
-                            param_group['lr'] = lr_this_step
+                            if args.ft_bert:
+                                param_group['lr'] = lr_this_step
+                            else:
+                                param_group['lr'] = 0
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1

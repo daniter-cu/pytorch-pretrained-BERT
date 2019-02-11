@@ -501,8 +501,7 @@ def main():
                                on_memory=args.on_memory, answerable=False)
 
     # Prepare model
-    model_state_dict = torch.load(args.bert_model, map_location='cpu') #TODO daniter: remove this map_location
-    ## TODO daniter: check if bert model is being loaded correctly
+    model_state_dict = torch.load(args.bert_model)
     context_model = BertModel.from_pretrained("bert-base-uncased")#, state_dict=model_state_dict)
     question_model = BertModel.from_pretrained("bert-base-uncased")#, state_dict=model_state_dict)
     context_model.to(device)
@@ -523,8 +522,6 @@ def main():
     # 768 is bert hidden size, 256 is GRU hidden size, 1 is the layers in the GRU
     model = RNNModel("GRU", len(tokenizer.vocab), 768, 768, 1, context_model, question_model, ngpu=n_gpu)
     model.load_state_dict(model_state_dict)
-    import pdb;
-    pdb.set_trace()
     model.to(device)
 
     # eval loader
