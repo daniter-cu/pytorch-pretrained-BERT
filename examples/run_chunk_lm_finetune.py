@@ -95,7 +95,7 @@ class BERTDataset(Dataset):
             raise Exception("No supported")
 
         while True:
-            t1, t2, target ,is_next_label = self.get_example(item)
+            t1, t2, target, is_next_label = self.get_example(item)
 
             # tokenize
             tokens_a = self.tokenizer.tokenize(t1)
@@ -127,8 +127,12 @@ class BERTDataset(Dataset):
         :return: (str, str, int), sentence 1, sentence 2, isNextSentence Label
         """
         t1, t2 = self.get_corpus_line(index)
+
+
+        candidate_targs = list(self.training_data_map[self.examples[index][1]])
+        random.shuffle(candidate_targs)
         targets = [tg for tg in
-                   np.random.choice(self.training_data_map[index], len(self.training_data_map[index]))
+                   candidate_targs
                    if tg[0] is not None]
 
         if targets:
@@ -155,6 +159,7 @@ class BERTDataset(Dataset):
             context_idx, question_idx = self.examples[item]
             t1 = self.contexts[context_idx]
             t2 = self.questions[question_idx]
+
             # used later to avoid random nextSentence from same doc
             return t1, t2
         else:
@@ -210,7 +215,7 @@ def random_word(tokens, tokenizer, question=False, tokens_question=None, tokens_
         assert tokens_question is not None
         assert tokens_target is not None
 
-        return tokens_question, tokens_target
+        return tokens_question, tokenizer.convert_tokens_to_ids(tokens_target)
 
     return tokens, output_label
 
@@ -228,7 +233,9 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     tokens_b = example.tokens_b
     tokens_question = example.target[0]
     tokens_target = example.target[1]
-    assert tokens_b == tokens_question
+    for tokb, tokq in zip(tokens_b, tokens_question):
+        if tokq != '[MASK]':
+            assert tokq == tokb
     # Modifies `tokens_a` and `tokens_b` in place so that the total
     # length is less than the specified length.
     # Account for [CLS], [SEP], [SEP] with "- 3"
@@ -268,7 +275,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     segment_ids.append(0)
 
     assert len(tokens_b) > 0
-    for token in tokens_b:
+    for token in t2_random:
         tokens.append(token)
         segment_ids.append(1)
     tokens.append("[SEP]")
@@ -303,7 +310,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
         logger.info(
                 "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
         logger.info("LM label: %s " % (lm_label_ids))
-        logger.info("Is next sentence label: %s " % (example.is_next))
+        logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
 
     features = InputFeatures(input_ids=input_ids,
                              input_mask=input_mask,
@@ -426,9 +433,10 @@ def main():
     if not args.do_train and not args.do_eval:
         raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
-    if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
-        raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
-    os.makedirs(args.output_dir, exist_ok=True)
+    if not args.test_run:
+        if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
+            raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+        os.makedirs(args.output_dir, exist_ok=True)
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
 
@@ -521,12 +529,12 @@ def main():
                     optimizer.zero_grad()
                     global_step += 1
                     if args.test_run and global_step == 20:
-                        logger.info("** ** * Saving fine - tuned model ** ** * ")
-                        model_to_save = model.module if hasattr(model,
-                                                                'module') else model  # Only save the model it-self
-                        output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-                        if args.do_train:
-                            torch.save(model_to_save.state_dict(), output_model_file)
+                        # logger.info("** ** * Saving fine - tuned model ** ** * ")
+                        # model_to_save = model.module if hasattr(model,
+                        #                                         'module') else model  # Only save the model it-self
+                        # output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
+                        # if args.do_train:
+                        #     torch.save(model_to_save.state_dict(), output_model_file)
                         return
 
         # Save a trained model
