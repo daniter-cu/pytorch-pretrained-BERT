@@ -8,5 +8,5 @@ python run_chunk_lm_finetune.py \
   --num_train_epochs 1.0 \
   --learning_rate 3e-5 \
   --train_batch_size 16 \
-  --max_seq_length 256 \
-  --test_run
+  --max_seq_length 256
+#  --test_run

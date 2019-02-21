@@ -100,7 +100,7 @@ class BERTDataset(Dataset):
             # tokenize
             tokens_a = self.tokenizer.tokenize(t1)
             tokens_b = self.tokenizer.tokenize(t2)
-            if len(tokens_a) + len(tokens_b) + 10 > self.seq_len or  target is None:
+            if target[0] is None or len(tokens_a) + len(target[1]) + 3 > self.seq_len :
                 item += 1
             else:
                 break
@@ -138,7 +138,7 @@ class BERTDataset(Dataset):
         if targets:
             target = targets[0]
         else:
-            target = None
+            target = (None, None) # keep same shape
         # Daniter we do not do next sentence prediction
 
         assert len(t1) > 0
@@ -274,7 +274,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     tokens.append("[SEP]")
     segment_ids.append(0)
 
-    assert len(tokens_b) > 0
+    assert len(t2_random) > 0
     for token in t2_random:
         tokens.append(token)
         segment_ids.append(1)
@@ -295,9 +295,23 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     while len(lm_label_ids) < max_seq_length:
         lm_label_ids.append(-1)
 
-    assert len(input_ids) == max_seq_length
+    assert len(input_ids) == max_seq_length, len(input_ids)
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
+
+    if len(lm_label_ids) != max_seq_length:
+        print("ERROR COULD NOT COMPUTE...!",len(lm_label_ids) )
+        logger.info("*** Example ***")
+        logger.info("guid: %s" % (example.guid))
+        logger.info("tokens: %s" % " ".join(
+            [str(x) for x in tokens]))
+        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+        logger.info(
+            "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+        logger.info("LM label: %s " % (lm_label_ids))
+        logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([t for t in lm_label_ids if t != -1])))
+
     assert len(lm_label_ids) == max_seq_length
 
     if example.guid < 5:
@@ -508,6 +522,7 @@ def main():
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, segment_ids, lm_label_ids, is_next = batch
+                continue
                 loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
