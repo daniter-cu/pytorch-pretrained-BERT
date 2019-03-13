@@ -316,17 +316,17 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
 
     assert len(lm_label_ids) == max_seq_length
 
-    if example.guid < 5:
-        logger.info("*** Example ***")
-        logger.info("guid: %s" % (example.guid))
-        logger.info("tokens: %s" % " ".join(
-                [str(x) for x in tokens]))
-        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        logger.info(
-                "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        logger.info("LM label: %s " % (lm_label_ids))
-        logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
+    # if example.guid < 5:
+    #     logger.info("*** Example ***")
+    #     logger.info("guid: %s" % (example.guid))
+    #     logger.info("tokens: %s" % " ".join(
+    #             [str(x) for x in tokens]))
+    #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+    #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+    #     logger.info(
+    #             "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+    #     logger.info("LM label: %s " % (lm_label_ids))
+    #     logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
 
     features = InputFeatures(input_ids=input_ids,
                              input_mask=input_mask,
@@ -577,12 +577,12 @@ def main():
                         #     torch.save(model_to_save.state_dict(), output_model_file)
                         return
 
-                if global_step % 50 == 0:
+                if global_step % 100 == 0:
                     with torch.no_grad():
                         model.eval()
                         answerable_loss = 0
-                        for batch_i, eval_batch in enumerate(tqdm(eval_dataloader_ans, desc="Iteration")):
-                            if batch_i > 100:
+                        for batch_i, eval_batch in enumerate(eval_dataloader_ans, desc="Iteration"):
+                            if batch_i > 50:
                                 break
                             eval_batch = tuple(t.to(device) for t in eval_batch)
                             input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
@@ -591,8 +591,8 @@ def main():
                         print("###### DANITER EVAL LOSS (ANSWERABLE): ", answerable_loss)
 
                         unanswerable_loss = 0
-                        for batch_i, eval_batch in enumerate(tqdm(eval_dataloader_unans, desc="Iteration")):
-                            if batch_i > 100:
+                        for batch_i, eval_batch in enumerate(eval_dataloader_unans, desc="Iteration"):
+                            if batch_i > 50:
                                 break
                             eval_batch = tuple(t.to(device) for t in eval_batch)
                             input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
