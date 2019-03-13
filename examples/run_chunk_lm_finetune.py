@@ -609,6 +609,30 @@ def main():
         if args.do_train:
             torch.save(model_to_save.state_dict(), output_model_file)
 
+        with torch.no_grad():
+            model.eval()
+            answerable_loss = 0
+            count = 0
+            for batch_i, eval_batch in enumerate(eval_dataloader_ans):
+                eval_batch = tuple(t.to(device) for t in eval_batch)
+                input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
+                loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
+                answerable_loss += loss.item()
+                count += 1
+            print("###### DANITER EVAL TOTAL LOSS (ANSWERABLE): ", answerable_loss / count)
+
+            unanswerable_loss = 0
+            count = 0
+            for batch_i, eval_batch in enumerate(eval_dataloader_unans):
+                eval_batch = tuple(t.to(device) for t in eval_batch)
+                input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
+                loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
+                unanswerable_loss += loss.item()
+                count += 1
+            print("###### DANITER EVAL TOTAL LOSS (UNANSWERABLE): ", unanswerable_loss/  count)
+
+            model.train()
+
 
 def _truncate_seq_pair(tokens_a, tokens_b, max_length):
     """Truncates a sequence pair in place to the maximum length."""
