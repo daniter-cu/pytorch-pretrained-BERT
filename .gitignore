@@ -126,4 +126,4 @@ tensorflow_code
 dataset/
 models/
 *.pkl
-
+*.out
