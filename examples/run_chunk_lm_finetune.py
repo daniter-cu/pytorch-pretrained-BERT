@@ -38,7 +38,7 @@ def warmup_linear(x, warmup=0.002):
 
 
 class BERTDataset(Dataset):
-    def __init__(self, corpus_path, tokenizer, seq_len, encoding="utf-8", on_memory=True):
+    def __init__(self, corpus_path, chunk_path, tokenizer, seq_len, encoding="utf-8", on_memory=True, keep_answerable=True):
         self.vocab = tokenizer.vocab
         self.tokenizer = tokenizer
         self.seq_len = seq_len
@@ -72,11 +72,13 @@ class BERTDataset(Dataset):
                         question = qas[j]['question']
                         unanswerable = qas[j]['is_impossible']
                         self.questions.append(question)
-                        if unanswerable:
+                        if unanswerable and keep_answerable:
+                            continue
+                        if not keep_answerable and not unanswerable:
                             continue
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
 
-            with open("../training_data_chunks.pkl", "rb") as handle:
+            with open(chunk_path, "rb") as handle:
                 self.training_data_map = pickle.load(handle)
 
 
@@ -343,6 +345,16 @@ def main():
                         type=str,
                         required=True,
                         help="The input train corpus.")
+    parser.add_argument("--chunk_file_train",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Chunk file.")
+    parser.add_argument("--chunk_file_test",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Chunk file.")
     parser.add_argument("--bert_model", default=None, type=str, required=True,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                              "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
@@ -458,8 +470,12 @@ def main():
     num_train_steps = None
     if args.do_train:
         print("Loading Train Dataset", args.train_file)
-        train_dataset = BERTDataset(args.train_file, tokenizer, seq_len=args.max_seq_length,
+        train_dataset = BERTDataset(args.train_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
                                      on_memory=args.on_memory)
+        val_dataset_ans = BERTDataset(args.train_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
+                                    on_memory=args.on_memory)
+        val_dataset_unans = BERTDataset(args.train_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
+                                    on_memory=args.on_memory, keep_answerable=False)
         num_train_steps = int(
             len(train_dataset) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
@@ -512,8 +528,13 @@ def main():
         logger.info("  Num steps = %d", num_train_steps)
 
         train_sampler = RandomSampler(train_dataset)
-
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+
+        eval_sampler_ans = RandomSampler(val_dataset_ans)
+        eval_sampler_unans = RandomSampler(val_dataset_unans)
+        eval_dataloader_ans = DataLoader(val_dataset_ans, sampler=eval_sampler_ans, batch_size=args.train_batch_size)
+        eval_dataloader_unans = DataLoader(val_dataset_unans, sampler=eval_sampler_unans, batch_size=args.train_batch_size)
+
 
         model.train()
         for _ in trange(int(args.num_train_epochs), desc="Epoch"):
@@ -550,6 +571,31 @@ def main():
                         # if args.do_train:
                         #     torch.save(model_to_save.state_dict(), output_model_file)
                         return
+
+                if global_step % 50 == 0:
+                    with torch.no_grad():
+                        model.eval()
+                        answerable_loss = 0
+                        for batch_i, eval_batch in enumerate(tqdm(eval_dataloader_ans, desc="Iteration")):
+                            if batch_i > 100:
+                                break
+                            eval_batch = tuple(t.to(device) for t in eval_batch)
+                            input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
+                            loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
+                            answerable_loss += loss.item()
+                        print("###### DANITER EVAL LOSS (ANSWERABLE): ", answerable_loss)
+
+                        unanswerable_loss = 0
+                        for batch_i, eval_batch in enumerate(tqdm(eval_dataloader_unans, desc="Iteration")):
+                            if batch_i > 100:
+                                break
+                            eval_batch = tuple(t.to(device) for t in eval_batch)
+                            input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
+                            loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
+                            unanswerable_loss += loss.item()
+                        print("###### DANITER EVAL LOSS (UNANSWERABLE): ", unanswerable_loss)
+
+                        model.train()
 
         # Save a trained model
         logger.info("** ** * Saving fine - tuned model ** ** * ")
