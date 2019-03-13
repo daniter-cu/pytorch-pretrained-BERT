@@ -54,6 +54,8 @@ class BERTDataset(Dataset):
         self.questions = []
         self.contexts = []
         self.examples = []
+        self.example_ids = []
+        self.mask_ids = []
 
         # load samples into memory
         if on_memory:
@@ -77,6 +79,9 @@ class BERTDataset(Dataset):
                         if not keep_answerable and not unanswerable:
                             continue
                         self.examples.append((len(self.contexts)-1, len(self.questions)-1))
+                        self.example_ids.append(qas[j]['id'])
+                        self.mask_ids.append(-1)
+
 
             with open(chunk_path, "rb") as handle:
                 self.training_data_map = pickle.load(handle)
@@ -117,7 +122,9 @@ class BERTDataset(Dataset):
                        torch.tensor(cur_features.input_mask),
                        torch.tensor(cur_features.segment_ids),
                        torch.tensor(cur_features.lm_label_ids),
-                       torch.tensor(cur_features.is_next))
+                       torch.tensor(cur_features.is_next),
+                       self.example_ids[item],
+                       self.mask_ids[item])
 
         return cur_tensors
 
@@ -132,13 +139,15 @@ class BERTDataset(Dataset):
 
 
         candidate_targs = list(self.training_data_map[self.examples[index][1]])
-        random.shuffle(candidate_targs)
-        targets = [tg for tg in
-                   candidate_targs
+        cand_targ_with_index = list(zip(candidate_targs, range(len(candidate_targs))))
+        random.shuffle(cand_targ_with_index)
+        targets = [(tg, targ_id) for tg, targ_id in
+                   cand_targ_with_index
                    if tg[0] is not None]
 
         if targets:
-            target = targets[0]
+            target = targets[0][0]
+            self.mask_ids[index] = targets[0][1]
         else:
             target = (None, None) # keep same shape
         # Daniter we do not do next sentence prediction
@@ -237,7 +246,7 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
     tokens_target = example.target[1]
     for tokb, tokq in zip(tokens_b, tokens_question):
         if tokq != '[MASK]':
-            assert tokq == tokb
+            assert tokq == tokb, (tokens_b, tokens_question)
     # Modifies `tokens_a` and `tokens_b` in place so that the total
     # length is less than the specified length.
     # Account for [CLS], [SEP], [SEP] with "- 3"
@@ -500,19 +509,27 @@ def main():
 
             answerable_loss = 0
             for batch_i, eval_batch in enumerate(eval_dataloader_ans):
-                eval_batch = tuple(t.to(device) for t in eval_batch)
+                if args.test_run and batch_i > 3:
+                    break
+                eids = eval_batch[-2]
+                mask_id = eval_batch[-1].data.numpy()
+                eval_batch = tuple(t.to(device) for t in eval_batch[:-2])
                 input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
                 loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
-                loss_writer.writerow([eids[0], loss.item(), "ANS"])
+                loss_writer.writerow([eids[0], mask_id[0], loss.item(), "ANS"])
                 answerable_loss += loss.item()
             print("###### DANITER EVAL LOSS (ANSWERABLE): ", answerable_loss)
 
             unanswerable_loss = 0
             for batch_i, eval_batch in enumerate(eval_dataloader_unans):
-                eval_batch = tuple(t.to(device) for t in eval_batch)
+                if args.test_run and batch_i > 3:
+                    break
+                eids = eval_batch[-2]
+                mask_id = eval_batch[-1].data.numpy()
+                eval_batch = tuple(t.to(device) for t in eval_batch[:-2])
                 input_ids, input_mask, segment_ids, lm_label_ids, is_next = eval_batch
                 loss = model(input_ids, segment_ids, input_mask, lm_label_ids, is_next)
-                loss_writer.writerow([eids[0], loss.item(), "UNANS"])
+                loss_writer.writerow([eids[0], mask_id[0], loss.item(), "UNANS"])
                 unanswerable_loss += loss.item()
             print("###### DANITER EVAL LOSS (UNANSWERABLE): ", unanswerable_loss)
 
