@@ -581,7 +581,7 @@ def main():
                     with torch.no_grad():
                         model.eval()
                         answerable_loss = 0
-                        for batch_i, eval_batch in enumerate(eval_dataloader_ans, desc="Iteration"):
+                        for batch_i, eval_batch in enumerate(eval_dataloader_ans):
                             if batch_i > 50:
                                 break
                             eval_batch = tuple(t.to(device) for t in eval_batch)
@@ -591,7 +591,7 @@ def main():
                         print("###### DANITER EVAL LOSS (ANSWERABLE): ", answerable_loss)
 
                         unanswerable_loss = 0
-                        for batch_i, eval_batch in enumerate(eval_dataloader_unans, desc="Iteration"):
+                        for batch_i, eval_batch in enumerate(eval_dataloader_unans):
                             if batch_i > 50:
                                 break
                             eval_batch = tuple(t.to(device) for t in eval_batch)
