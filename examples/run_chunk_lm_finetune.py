@@ -477,9 +477,9 @@ def main():
         print("Loading Train Dataset", args.train_file)
         train_dataset = BERTDataset(args.train_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
                                      on_memory=args.on_memory)
-        val_dataset_ans = BERTDataset(args.dev_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
+        val_dataset_ans = BERTDataset(args.dev_file, args.chunk_file_test, tokenizer, seq_len=args.max_seq_length,
                                     on_memory=args.on_memory)
-        val_dataset_unans = BERTDataset(args.dev_file, args.chunk_file_train, tokenizer, seq_len=args.max_seq_length,
+        val_dataset_unans = BERTDataset(args.dev_file, args.chunk_file_test, tokenizer, seq_len=args.max_seq_length,
                                     on_memory=args.on_memory, keep_answerable=False)
         num_train_steps = int(
             len(train_dataset) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
