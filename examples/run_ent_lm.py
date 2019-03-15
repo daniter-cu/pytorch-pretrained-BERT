@@ -112,7 +112,7 @@ class BERTDataset(Dataset):
         tokens_a = self.tokenizer.tokenize(t1)
         tokens_b = t2
 
-        if len(tokens_a) + len(tokens_b) > self.seq_len + 3:
+        if len(tokens_a) + len(tokens_b) > self.seq_len - 3:
             end = self.seq_len - 3 - len(tokens_b)
             tokens_a = tokens_a[:end]
 
