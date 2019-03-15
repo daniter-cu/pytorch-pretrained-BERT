@@ -90,6 +90,8 @@ class BERTDataset(Dataset):
                 for i in range(len(targets)):
                     # if context_len + len(targets[i]) > (self.seq_len + 3):
                     #     continue
+                    if len(targets[i]) == 0:
+                        continue
                     self.examples.append((context_id, i))
 
         # load samples later lazily from disk
@@ -529,7 +531,7 @@ def main():
 
 
         model.train()
-        for _ in trange(int(args.num_train_epochs), desc="Epoch"):
+        for epoch in trange(int(args.num_train_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
@@ -590,11 +592,11 @@ def main():
                 #         model.train()
 
         # Save a trained model
-        logger.info("** ** * Saving fine - tuned model ** ** * ")
-        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
-        output_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-        if args.do_train:
-            torch.save(model_to_save.state_dict(), output_model_file)
+            logger.info("** ** * Saving fine - tuned model ** ** * ")
+            model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
+            output_model_file = os.path.join(args.output_dir, "pytorch_model%s.bin" % str(epoch))
+            if args.do_train:
+                torch.save(model_to_save.state_dict(), output_model_file)
 
         # with torch.no_grad():
         #     model.eval()
