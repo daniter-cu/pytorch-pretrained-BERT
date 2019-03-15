@@ -84,12 +84,12 @@ class BERTDataset(Dataset):
                 self.training_data_map[k] = list(v)
 
             for context_id, targets in self.training_data_map.items():
-                context_len = len(self.tokenizer.tokenize(self.contexts[context_id]))
-                if context_len > (self.seq_len + 3):
-                    continue
+                # context_len = len(self.tokenizer.tokenize(self.contexts[context_id]))
+                # if context_len > (self.seq_len + 3):
+                #     continue
                 for i in range(len(targets)):
-                    if context_len + len(targets[i]) > (self.seq_len + 3):
-                        continue
+                    # if context_len + len(targets[i]) > (self.seq_len + 3):
+                    #     continue
                     self.examples.append((context_id, i))
 
         # load samples later lazily from disk
@@ -111,6 +111,10 @@ class BERTDataset(Dataset):
         # tokenize
         tokens_a = self.tokenizer.tokenize(t1)
         tokens_b = t2
+
+        if len(tokens_a) + len(tokens_b) > self.seq_len + 3:
+            end = self.seq_len - 3 - len(tokens_b)
+            tokens_a = tokens_a[:end]
 
         # combine to one sample
         cur_example = InputExample(guid=cur_id, tokens_a=tokens_a, tokens_b=tokens_b, is_next=is_next_label)
