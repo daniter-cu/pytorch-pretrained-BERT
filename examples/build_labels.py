@@ -52,11 +52,15 @@ def build_labels(dev_data_file, test_data_file, limit=None):
                     questions[qid] = question
 
     labels = {}
+    counter = 0
     for id, q in questions.items() if limit is None else list(questions.items())[:limit]:
         res = predictor.predict(sentence=q)
         tokens = []
         get_q_parts(res['hierplane_tree']['root'], nlp, tokens)
         labels[id] = tokens
+        counter += 1
+        if counter % 1000 == 0:
+            print("Finished with ", str(counter))
 
     with open("part_labels.pkl", "wb") as f:
         pickle.dump(labels, f)
