@@ -2,6 +2,7 @@ from allennlp.predictors.predictor import Predictor
 import json
 import pickle
 import spacy
+import sys
 
 def print_np(entry):
     phrase = ""
@@ -34,8 +35,8 @@ def get_q_parts(entry, nlp, tokens):
 
 
 def build_labels(dev_data_file, test_data_file, limit=None):
-    nlp = spacy.load("en_core_web_sm")
     predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/elmo-constituency-parser-2018.03.14.tar.gz")
+    nlp = spacy.load("en_core_web_sm")
     questions = {}
 
     for data_file in [dev_data_file, test_data_file]:
@@ -53,7 +54,9 @@ def build_labels(dev_data_file, test_data_file, limit=None):
 
     labels = {}
     counter = 0
-    for id, q in questions.items() if limit is None else list(questions.items())[:limit]:
+    section = sys.argv[1]
+    chunk = 6000
+    for id, q in questions.items()[chunk*section:chunk*(section+1)] if limit is None else list(questions.items())[:limit]:
         res = predictor.predict(sentence=q)
         tokens = []
         get_q_parts(res['hierplane_tree']['root'], nlp, tokens)
@@ -66,4 +69,4 @@ def build_labels(dev_data_file, test_data_file, limit=None):
         pickle.dump(labels, f)
 
 if __name__ == '__main__':
-    build_labels("../dataset/dev-v2.0.json", "../dataset/train-v2.0.json")
+    build_labels("../../Squad2Generative/data/dev-v2.0.json", "../../Squad2Generative/data/train-v2.0.json")
