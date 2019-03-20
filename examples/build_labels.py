@@ -65,7 +65,7 @@ def build_labels(dev_data_file, test_data_file, limit=None):
         if counter % 1000 == 0:
             print("Finished with ", str(counter))
 
-    with open("part_labels.pkl", "wb") as f:
+    with open("part_labels"+str(section)+".pkl", "wb") as f:
         pickle.dump(labels, f)
 
 if __name__ == '__main__':
