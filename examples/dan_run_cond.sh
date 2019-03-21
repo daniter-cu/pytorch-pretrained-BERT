@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python run_ent_lm.py \
+python train_cond.py \
   --bert_model bert-base-uncased \
   --do_train \
   --train_file ../../Squad2Generative/data/train-v2.0.json \
