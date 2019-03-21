@@ -54,9 +54,9 @@ def build_labels(dev_data_file, test_data_file, limit=None):
 
     labels = {}
     counter = 0
-    section = sys.argv[1]
+    section = int(sys.argv[1])
     chunk = 6000
-    for id, q in questions.items()[chunk*section:chunk*(section+1)] if limit is None else list(questions.items())[:limit]:
+    for id, q in list(questions.items())[chunk*section:chunk*(section+1)] if limit is None else list(questions.items())[:limit]:
         res = predictor.predict(sentence=q)
         tokens = []
         get_q_parts(res['hierplane_tree']['root'], nlp, tokens)
