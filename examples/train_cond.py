@@ -87,7 +87,7 @@ class BERTDataset(Dataset):
                             self.examples.append((len(self.contexts) - 1, len(self.questions) -1, qid, target_i))
 
 
-
+            random.shuffle(self.examples)
         # load samples later lazily from disk
         else:
             raise Exception("No supported")
