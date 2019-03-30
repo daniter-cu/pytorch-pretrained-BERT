@@ -182,6 +182,7 @@ class BERTDataset(Dataset):
             context_idx, _, q_id, target_i = self.examples[item]
             t1 = self.contexts[context_idx]
             targets = list(self.raw_targets[q_id])
+            targets = [(tag,word) for tag,word in targets if word]
             first_targets = [(tag, words) for tag, words in targets if "-"  not in tag  and "W" not in tag]
             middle_targets_int = [(tag, words) for tag, words in targets if "-"   in tag]
             middle_targets = []
