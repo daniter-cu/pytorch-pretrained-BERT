@@ -97,7 +97,8 @@ def get_copies(q, c, parse):
         for cand in spans.keys():
             if x_in_y(s, tokenizer.tokenize(cand)) and (min_span[0] is None or len(cand) < len(min_span[0])):
                 min_span = (cand, spans[cand])
-        annotated_copies.append((s, min_span))
+        if min_span[1] is not None:
+            annotated_copies.append((s, min_span))
     return annotated_copies
 
 
@@ -399,4 +400,6 @@ def test_labels(dev_data_file, test_data_file):
 
 
 if __name__ == '__main__':
-    build_labels("../../Squad2Generative/data/dev-v2.0.json", "../../Squad2Generative/data/train-v2.0.json")
+    build_labels("../dataset/dev-v2.0.json", "../dataset/train-v2.0.json", limit=100)
+    #build_labels("../../Squad2Generative/data/dev-v2.0.json", "../../Squad2Generative/data/train-v2.0.json")
+
