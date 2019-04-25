@@ -400,6 +400,6 @@ def test_labels(dev_data_file, test_data_file):
 
 
 if __name__ == '__main__':
-    build_labels("../dataset/dev-v2.0.json", "../dataset/train-v2.0.json", limit=100)
-    #build_labels("../../Squad2Generative/data/dev-v2.0.json", "../../Squad2Generative/data/train-v2.0.json")
+    #build_labels("../dataset/dev-v2.0.json", "../dataset/train-v2.0.json", limit=100)
+    build_labels("../../Squad2Generative/data/dev-v2.0.json", "../../Squad2Generative/data/train-v2.0.json")
 
