@@ -214,6 +214,8 @@ def get_token_span(tokens, q):
 
 
 def get_overlap(tokens, span, part, copied_start, copied_end, const_part, const_span, const_start, const_end, q_tokens):
+    if const_start == -1 or copied_start == -1:
+        return None
     if (copied_start < const_start and copied_end > const_start) or (
             const_start < copied_start and const_end > copied_start):
         min_start = min(const_start, copied_start)
