@@ -141,7 +141,7 @@ def get_q_parts_tmp(entry, nlp, tokens, siblings=None):
             for sib in siblings:
                 if sib['nodeType'] == 'RB':
                     rb_found = True
-                if sib['nodeType'] in ['VBZ', 'RB', 'MD', 'JJ', 'VBD']:
+                if sib['nodeType'] in ['VBZ', 'RB', 'MD', 'JJ', 'VBD', 'VBP', 'VB', 'VBN', 'VBG']:
                     prepend += sib['word'] + " "
         if not rb_found:
             prepend = ""
@@ -163,29 +163,31 @@ def get_q_parts_tmp(entry, nlp, tokens, siblings=None):
                 for sib in siblings:
                     if sib['nodeType'] == 'RB':
                         rb_found = True
-                    if sib['nodeType'] in ['VBZ', 'RB', 'MD', 'JJ', 'VBD']:
+                    if sib['nodeType'] in ['VBZ', 'RB', 'MD', 'JJ', 'VBD', 'VBP', 'VB', 'VBN', 'VBG', 'NP']:
                         prepend += sib['word'] + " "
             if not rb_found:
-                prepend = ""
-            tokens.append((nodeType, prepend + word))  # (entry['word'])
+                prepend = word
+            tokens.append((nodeType, prepend))  # (entry['word'])
         else:
             if 'children' in entry and entry['children']:
                 for child in entry['children']:
                     get_q_parts(child, nlp, tokens)
+    elif entry['nodeType'] == 'RB':
+        if siblings:
+            output = ""
+            for sib in siblings:
+                if sib['nodeType'] in ['VBZ', 'RB', 'MD', 'JJ', 'VBD', 'VBP', 'VB', 'VBN', 'VBG']:
+                    output += sib['word'] + " "
+            tokens.append(("[" + entry['nodeType'] + "]", output.strip()))
+        else:
+            tokens.append(("[" + entry['nodeType'] + "]", entry['word']))
+
     else:
         if 'children' in entry and entry['children']:
-            #             has_rb = False
-            #             for child in entry['children']:
-            #                 if child['nodeType'] == 'RB':
-            #                     has_rb = True
-            #             if has_rb:
-            #                 for child in entry['children']:
-            #                     print(child['nodeType'], child['word'])
-
             siblings = [] if siblings is None else siblings.copy()
             siblings.extend(entry['children'])
             for child in entry['children']:
-                get_q_parts_tmp(child, nlp, tokens, siblings)
+                get_q_parts_tmp(child, nlp, tokens, entry['children'])
 
 
 def get_const_chunks(q):
@@ -262,7 +264,6 @@ def combine_chunks(copied_chunks, q_chunks, parse, q):
                                   const_part, const_span, const_start, const_end, q_tokens)
             if overlap:
                 output_chunks.append(overlap)
-                added = True
                 found = True
                 overlap_marker[i] = True
                 break
@@ -293,6 +294,8 @@ def combine_chunks(copied_chunks, q_chunks, parse, q):
             i_end = i_start + len(itokens)
             j_start = x_in_y_int(jtokens, q_tokens)
             j_end = j_start + len(jtokens)
+            if i_start < 0 or j_start < 0:
+                continue
             if (i_start <= j_start and i_end > j_start) or (j_start <= i_start and j_end > i_start):
                 if len(itokens) > len(jtokens):
                     output_chunks.remove((jtokens, (jspan, jpart)))
