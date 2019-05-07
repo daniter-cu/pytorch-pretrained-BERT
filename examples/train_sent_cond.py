@@ -47,6 +47,41 @@ def x_in_y_int(query, base):
             return i
     return -1
 
+def mask_question(tokens_b, target_span):
+    if not len(target_span):
+        return tokens_b
+    if len(target_span) > 1:
+        if target_span[0] in ['ca', 'can', 'is', 'was', 'do', 'does', 'were', 'are', 'have', 'did',
+                              'would', 'should', 'could'] and target_span[1] == 'n':
+            new_tok = target_span[0] + target_span[1]
+            del target_span[0]
+            del target_span[0]
+            target_span.insert(0, new_tok)
+        elif target_span[0] == 'can' and target_span[1] == 'not' and 'cannot' in tokens_b:
+            del target_span[0]
+            del target_span[0]
+            target_span.insert(0, 'cannot')
+        elif target_span[0] == 'n' and target_span[1] == "'":
+            del target_span[0]
+    span_start = x_in_y_int(target_span, tokens_b)
+    if span_start >= 0:
+        for i in range(span_start, span_start + len(target_span)):
+            del tokens_b[span_start]
+        tokens_b.insert(span_start, '[MASK]')
+    else:
+        # find first tok
+        while len(target_span) > 0 and target_span[0] not in tokens_b:
+            target_span = target_span[1:]
+        if len(target_span) == 0:
+            print("This sux")
+            return tokens_b
+        first_tok = tokens_b.index(target_span[0])
+        for tok in tokens_b:
+            if tok in target_span:
+                tokens_b.remove(tok)
+        tokens_b.insert(first_tok, '[MASK]')
+    return tokens_b
+
 class BERTDataset(Dataset):
     def __init__(self, corpus_path, target_path, tokenizer, seq_len, encoding="utf-8", on_memory=True,
                  keep_answerable=True, multi_hint=False):
@@ -108,6 +143,8 @@ class BERTDataset(Dataset):
         # last line of doc won't be used, because there's no "nextSentence". Additionally, we start counting at 0.
         return len(self.examples)
 
+
+
     def __getitem__(self, item):
         cur_id = self.sample_counter
         self.sample_counter += 1
@@ -130,18 +167,21 @@ class BERTDataset(Dataset):
         target_tag, target_span = target
 
         # mask question
-        span_start = x_in_y_int(target_span, tokens_b)
-        if span_start >= 0:
-            for i in range(span_start, span_start+len(target_span)):
-                del tokens_b[span_start]
-            tokens_b.insert(span_start, '[MASK]')
-        else:
-            # find first tok
-            first_tok = tokens_b.index(target_span[0])
-            for tok in tokens_b:
-                if tok in target_span:
-                    tokens_b.remove(tok)
-            tokens_b.insert(first_tok, '[MASK]')
+        tokens_b = mask_question(tokens_b, target_span)
+
+
+        # span_start = x_in_y_int(target_span, tokens_b)
+        # if span_start >= 0:
+        #     for i in range(span_start, span_start+len(target_span)):
+        #         del tokens_b[span_start]
+        #     tokens_b.insert(span_start, '[MASK]')
+        # else:
+        #     # find first tok
+        #     first_tok = tokens_b.index(target_span[0])
+        #     for tok in tokens_b:
+        #         if tok in target_span:
+        #             tokens_b.remove(tok)
+        #     tokens_b.insert(first_tok, '[MASK]')
 
 
         tokens_b += ["[SEP]"] + self.tokenizer.tokenize(target_tag) + ["[SEP]"]
