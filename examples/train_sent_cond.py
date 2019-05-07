@@ -392,17 +392,17 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
 
     assert len(lm_label_ids) == max_seq_length
 
-    if example.guid < 5:
-        logger.info("*** Example ***")
-        logger.info("guid: %s" % (example.guid))
-        logger.info("tokens: %s" % " ".join(
-                [str(x) for x in tokens]))
-        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        logger.info(
-                "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        logger.info("LM label: %s " % (lm_label_ids))
-        logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
+    # if example.guid < 5:
+    #     logger.info("*** Example ***")
+    #     logger.info("guid: %s" % (example.guid))
+    #     logger.info("tokens: %s" % " ".join(
+    #             [str(x) for x in tokens]))
+    #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+    #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+    #     logger.info(
+    #             "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+    #     logger.info("LM label: %s " % (lm_label_ids))
+    #     logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
 
     features = InputFeatures(input_ids=input_ids,
                              input_mask=input_mask,
