@@ -73,7 +73,6 @@ def mask_question(tokens_b, target_span):
         while len(target_span) > 0 and target_span[0] not in tokens_b:
             target_span = target_span[1:]
         if len(target_span) == 0:
-            print("This sux")
             return tokens_b
         first_tok = tokens_b.index(target_span[0])
         for tok in tokens_b:
