@@ -35,6 +35,17 @@ def warmup_linear(x, warmup=0.002):
         return x/warmup
     return 1.0 - x
 
+def x_in_y_int(query, base):
+    try:
+        l = len(query)
+    except TypeError:
+        l = 1
+        query = type(base)((query,))
+
+    for i in range(len(base)):
+        if base[i:i + l] == query:
+            return i
+    return -1
 
 class BERTDataset(Dataset):
     def __init__(self, corpus_path, target_path, tokenizer, seq_len, encoding="utf-8", on_memory=True,
@@ -117,6 +128,22 @@ class BERTDataset(Dataset):
         or it is the tag appended to the entry.
         '''
         target_tag, target_span = target
+
+        # mask question
+        span_start = x_in_y_int(target_span, tokens_b)
+        if span_start >= 0:
+            for i in range(span_start, span_start+len(target_span)):
+                del tokens_b[span_start]
+            tokens_b.insert(span_start, '[MASK]')
+        else:
+            # find first tok
+            first_tok = tokens_b.index(target_span[0])
+            for tok in tokens_b:
+                if tok in target_span:
+                    tokens_b.remove(tok)
+            tokens_b.insert(first_tok, '[MASK]')
+
+
         tokens_b += ["[SEP]"] + self.tokenizer.tokenize(target_tag) + ["[SEP]"]
         targets = target_span + ["[SEP]"]
 
@@ -172,6 +199,8 @@ class BERTDataset(Dataset):
             t2 = self.questions[q_idx]
             targets = list(self.raw_targets[q_id])
             targets = [(tag,word) for (word,(_,tag)) in targets if word]
+            if target_i >= len(targets):
+                target_i = len(targets) - 1
             target = targets[target_i]
 
             # used later to avoid random nextSentence from same doc
@@ -324,17 +353,17 @@ def convert_example_to_features(example, max_seq_length, tokenizer):
 
     assert len(lm_label_ids) == max_seq_length
 
-    # if example.guid < 5:
-    #     logger.info("*** Example ***")
-    #     logger.info("guid: %s" % (example.guid))
-    #     logger.info("tokens: %s" % " ".join(
-    #             [str(x) for x in tokens]))
-    #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-    #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-    #     logger.info(
-    #             "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-    #     logger.info("LM label: %s " % (lm_label_ids))
-    #     logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
+    if example.guid < 5:
+        logger.info("*** Example ***")
+        logger.info("guid: %s" % (example.guid))
+        logger.info("tokens: %s" % " ".join(
+                [str(x) for x in tokens]))
+        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+        logger.info(
+                "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+        logger.info("LM label: %s " % (lm_label_ids))
+        logger.info("lm label tokens: %s" % (tokenizer.convert_ids_to_tokens([ t for t in lm_label_ids if t != -1])))
 
     features = InputFeatures(input_ids=input_ids,
                              input_mask=input_mask,
@@ -422,7 +451,7 @@ def main():
                         help="local_rank for distributed training on gpus")
     parser.add_argument('--seed',
                         type=int,
-                        default=42,
+                        default=242,
                         help="random seed for initialization")
     parser.add_argument('--gradient_accumulation_steps',
                         type=int,
