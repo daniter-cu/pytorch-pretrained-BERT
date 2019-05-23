@@ -7,6 +7,6 @@ python train_negation_exp.py \
   --dev_file ../../negation_test_data.pkl \
   --output_dir ./model_neg_exp \
   --num_train_epochs 2.0 \
-  --learning_rate 1e-5 \
+  --learning_rate 5e-6 \
   --train_batch_size 16 \
   --max_seq_length 256
