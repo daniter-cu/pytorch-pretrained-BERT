@@ -10,7 +10,6 @@ import os
 import logging
 import argparse
 import pickle
-from tqdm import tqdm, trange
 
 import numpy as np
 import torch
@@ -18,7 +17,6 @@ from torch.utils.data import DataLoader, RandomSampler
 
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertForSequenceClassification
-from pytorch_pretrained_bert.optimization import BertAdam
 from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 
 from torch.utils.data import Dataset
@@ -443,6 +441,7 @@ def main():
     eval_sampler = RandomSampler(val_dataset)
     eval_dataloader = DataLoader(val_dataset, sampler=eval_sampler, batch_size=args.train_batch_size)
 
+    output = []
     with torch.no_grad():
         model.eval()
         total_acc = []
@@ -452,6 +451,7 @@ def main():
             input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
             logits = model(input_ids, segment_ids, input_mask, labels=None)
             preds = logits.detach().cpu().numpy()
+            output.append((input_ids, labels, preds))
             preds = np.argmax(preds, axis=1)
             acc = (preds == labels.detach().cpu().numpy()).mean()
             total_acc.append(acc)
@@ -460,6 +460,8 @@ def main():
         print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
         print("###### DANITER EVAL BASELINE:", np.mean(naive_baseline))
 
+    with open("neg_exp_output.pkl") as f:
+        pickle.dump(output, f)
 
 
 if __name__ == "__main__":
