@@ -407,25 +407,16 @@ def main():
     if n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
-    if not args.do_train and not args.do_eval:
-        raise ValueError("At least one of `do_train` or `do_eval` must be True.")
-
-    if not args.test_run:
-        if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
-            raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
-        os.makedirs(args.output_dir, exist_ok=True)
-
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
 
     #train_examples = None
     num_train_steps = None
-    if args.do_train:
-        print("Loading Train Dataset", args.train_file)
-        train_dataset = BERTDataset(args.train_file, tokenizer, seq_len=args.max_seq_length,
+    print("Loading Train Dataset", args.train_file)
+    train_dataset = BERTDataset(args.train_file, tokenizer, seq_len=args.max_seq_length,
                                      on_memory=args.on_memory)
-        val_dataset = BERTDataset(args.dev_file, tokenizer, seq_len=args.max_seq_length,
+    val_dataset = BERTDataset(args.dev_file, tokenizer, seq_len=args.max_seq_length,
                                     on_memory=args.on_memory)
-        num_train_steps = int(
+    num_train_steps = int(
             len(train_dataset) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
     # Prepare model
