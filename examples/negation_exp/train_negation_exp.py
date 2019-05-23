@@ -500,7 +500,7 @@ def main():
                         #     torch.save(model_to_save.state_dict(), output_model_file)
                         return
 
-                if global_step % 500 == 0:
+                if global_step % 50 == 0:
                     with torch.no_grad():
                         model.eval()
                         eval_loss = 0
