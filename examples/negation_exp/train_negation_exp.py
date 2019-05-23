@@ -491,7 +491,7 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                    if args.test_run and global_step == 3:
+                    if args.test_run and global_step == 11:
                         # logger.info("** ** * Saving fine - tuned model ** ** * ")
                         # model_to_save = model.module if hasattr(model,
                         #                                         'module') else model  # Only save the model it-self
@@ -500,18 +500,26 @@ def main():
                         #     torch.save(model_to_save.state_dict(), output_model_file)
                         return
 
-                if global_step % 50 == 0:
+                if global_step % 10 == 0:
                     with torch.no_grad():
                         model.eval()
-                        eval_loss = 0
+                        total_acc = []
                         for batch_i, eval_batch in enumerate(eval_dataloader):
-                            if batch_i > 50:
+                            if batch_i > 20:
                                 break
+                            preds = []
                             eval_batch = tuple(t.to(device) for t in eval_batch)
                             input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
-                            loss = model(input_ids, segment_ids, input_mask, labels=labels)
-                            eval_loss += loss.item()
-                        print("###### DANITER EVAL LOSS : ", eval_loss / 50)
+                            logits = model(input_ids, segment_ids, input_mask, labels=None)
+                            if len(preds) == 0:
+                                preds.append(logits.data.numpy())
+                            else:
+                                preds[0] = np.append(preds[0], logits.data.numpy(), axis=0)
+                            preds = preds[0]
+                            preds = np.argmax(preds, axis=1)
+                            acc = (preds == labels.numpy()).mean()
+                            total_acc.append(acc)
+                        print("###### DANITER EVAL ACC : ", np.mean(total_acc))
                         model.train()
 
         # Save a trained model
@@ -523,15 +531,20 @@ def main():
 
         with torch.no_grad():
             model.eval()
-            eval_loss = 0
-            count = 0
+            total_acc = []
             for batch_i, eval_batch in enumerate(eval_dataloader):
                 eval_batch = tuple(t.to(device) for t in eval_batch)
-                input_ids, input_mask, segment_ids, lm_label_ids, is_next, label = eval_batch
-                loss = model(input_ids, segment_ids, input_mask, labels=labels)
-                eval_loss += loss.item()
-                count += 1
-            print("###### DANITER EVAL TOTAL LOSS (ANSWERABLE): ", eval_loss / count)
+                input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
+                logits = model(input_ids, segment_ids, input_mask, labels=None)
+                if len(preds) == 0:
+                    preds.append(logits.data.numpy())
+                else:
+                    preds[0] = np.append(preds[0], logits.data.numpy(), axis=0)
+                preds = preds[0]
+                preds = np.argmax(preds, axis=1)
+                acc = (preds == labels.numpy()).mean()
+                total_acc.append(acc)
+            print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
 
 
             model.train()
