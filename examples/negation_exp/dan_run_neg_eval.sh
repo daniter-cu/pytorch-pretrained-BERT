@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python train_negation_exp.py \
+python eval_negation_exp.py \
   --bert_model bert-base-uncased \
   --do_train \
   --model_weights ./model_neg_exp/pytorch_model1.bin \
