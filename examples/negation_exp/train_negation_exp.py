@@ -517,6 +517,7 @@ def main():
                                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
                             preds = preds[0]
                             preds = np.argmax(preds, axis=1)
+                            print(preds)
                             acc = (preds == labels.detach().cpu().numpy()).mean()
                             total_acc.append(acc)
                         print("###### DANITER EVAL ACC : ", np.mean(total_acc))
@@ -529,22 +530,22 @@ def main():
             if args.do_train:
                 torch.save(model_to_save.state_dict(), output_model_file)
 
-        with torch.no_grad():
-            model.eval()
-            total_acc = []
-            for batch_i, eval_batch in enumerate(eval_dataloader):
-                eval_batch = tuple(t.to(device) for t in eval_batch)
-                input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
-                logits = model(input_ids, segment_ids, input_mask, labels=None)
-                if len(preds) == 0:
-                    preds.append(logits.detach().cpu().numpy())
-                else:
-                    preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
-                preds = preds[0]
-                preds = np.argmax(preds, axis=1)
-                acc = (preds == labels.detach().cpu().numpy()).mean()
-                total_acc.append(acc)
-            print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
+            with torch.no_grad():
+                model.eval()
+                total_acc = []
+                for batch_i, eval_batch in enumerate(eval_dataloader):
+                    eval_batch = tuple(t.to(device) for t in eval_batch)
+                    input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
+                    logits = model(input_ids, segment_ids, input_mask, labels=None)
+                    if len(preds) == 0:
+                        preds.append(logits.detach().cpu().numpy())
+                    else:
+                        preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+                    preds = preds[0]
+                    preds = np.argmax(preds, axis=1)
+                    acc = (preds == labels.detach().cpu().numpy()).mean()
+                    total_acc.append(acc)
+                print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
 
 
             model.train()
