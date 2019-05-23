@@ -5,7 +5,7 @@ python train_negation_exp.py \
   --do_train \
   --train_file ../../negation_training_data.pkl \
   --dev_file ../../negation_test_data.pkl \
-  --output_dir ../../model_neg_exp \
+  --output_dir ./model_neg_exp \
   --num_train_epochs 10.0 \
   --learning_rate 3e-5 \
   --train_batch_size 16 \
