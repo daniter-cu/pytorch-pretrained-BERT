@@ -460,7 +460,7 @@ def main():
         print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
         print("###### DANITER EVAL BASELINE:", np.mean(naive_baseline))
 
-    with open("neg_exp_output.pkl") as f:
+    with open("neg_exp_output.pkl", "wb") as f:
         pickle.dump(output, f)
 
 
