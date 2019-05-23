@@ -465,6 +465,7 @@ def main():
         eval_dataloader = DataLoader(val_dataset, sampler=eval_sampler, batch_size=args.train_batch_size)
 
         model.train()
+        losses = []
         for epoch in trange(int(args.num_train_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
@@ -481,6 +482,7 @@ def main():
 
                 loss.backward()
                 tr_loss += loss.item()
+                losses.append(loss.item())
                 nb_tr_examples += input_ids.size(0)
                 nb_tr_steps += 1
                 if (step + 1) % args.gradient_accumulation_steps == 0:
@@ -501,9 +503,12 @@ def main():
                         return
 
                 if global_step % 10 == 0:
+
                     with torch.no_grad():
+                        print("Training loss:", np.mean(losses[-10:-1]))
                         model.eval()
                         total_acc = []
+                        naive_baseline = []
                         for batch_i, eval_batch in enumerate(eval_dataloader):
                             if batch_i > 20:
                                 break
@@ -519,7 +524,10 @@ def main():
                             preds = np.argmax(preds, axis=1)
                             acc = (preds == labels.detach().cpu().numpy()).mean()
                             total_acc.append(acc)
+                            baseline = (preds == np.array([1]*len(preds))).mean()
+                            naive_baseline.append( baseline )
                         print("###### DANITER EVAL ACC : ", np.mean(total_acc))
+                        print("###### DANITER EVAL BASELINE:", np.mean(naive_baseline))
                         model.train()
 
         # Save a trained model
@@ -532,6 +540,7 @@ def main():
             with torch.no_grad():
                 model.eval()
                 total_acc = []
+                naive_baseline = []
                 for batch_i, eval_batch in enumerate(eval_dataloader):
                     preds = []
                     eval_batch = tuple(t.to(device) for t in eval_batch)
@@ -545,8 +554,10 @@ def main():
                     preds = np.argmax(preds, axis=1)
                     acc = (preds == labels.detach().cpu().numpy()).mean()
                     total_acc.append(acc)
+                    baseline = (preds == np.array([1] * len(preds))).mean()
+                    naive_baseline.append(baseline)
                 print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
-
+                print("###### DANITER EVAL BASELINE:", np.mean(naive_baseline))
 
             model.train()
 
