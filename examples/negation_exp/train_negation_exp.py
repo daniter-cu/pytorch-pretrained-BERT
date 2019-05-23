@@ -517,7 +517,7 @@ def main():
                                 preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
                             preds = preds[0]
                             preds = np.argmax(preds, axis=1)
-                            acc = (preds == labels.numpy()).mean()
+                            acc = (preds == labels.detach().cpu().numpy()).mean()
                             total_acc.append(acc)
                         print("###### DANITER EVAL ACC : ", np.mean(total_acc))
                         model.train()
@@ -542,7 +542,7 @@ def main():
                     preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
                 preds = preds[0]
                 preds = np.argmax(preds, axis=1)
-                acc = (preds == labels.numpy()).mean()
+                acc = (preds == labels.detach().cpu().numpy()).mean()
                 total_acc.append(acc)
             print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
 
