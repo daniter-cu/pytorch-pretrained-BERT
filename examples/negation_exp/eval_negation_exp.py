@@ -451,7 +451,7 @@ def main():
             input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
             logits = model(input_ids, segment_ids, input_mask, labels=None)
             preds = logits.detach().cpu().numpy()
-            output.append((input_ids, labels, preds))
+            output.append((input_ids.detach().cpu().numpy(), labels.detach().cpu().numpy(), preds))
             preds = np.argmax(preds, axis=1)
             acc = (preds == labels.detach().cpu().numpy()).mean()
             total_acc.append(acc)
