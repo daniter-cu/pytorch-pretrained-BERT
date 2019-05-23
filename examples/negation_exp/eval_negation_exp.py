@@ -10,6 +10,8 @@ import os
 import logging
 import argparse
 import pickle
+from tqdm import tqdm, trange
+
 
 import numpy as np
 import torch
@@ -446,7 +448,7 @@ def main():
         model.eval()
         total_acc = []
         naive_baseline = []
-        for batch_i, eval_batch in enumerate(eval_dataloader):
+        for batch_i, eval_batch in enumerate(tqdm(train_dataloader, desc="data")):
             eval_batch = tuple(t.to(device) for t in eval_batch)
             input_ids, input_mask, segment_ids, lm_label_ids, is_next, labels = eval_batch
             logits = model(input_ids, segment_ids, input_mask, labels=None)
@@ -460,7 +462,7 @@ def main():
         print("###### DANITER EVAL TOTAL ACC: ", np.mean(total_acc))
         print("###### DANITER EVAL BASELINE:", np.mean(naive_baseline))
 
-    with open("neg_exp_output.pkl", "wb") as f:
+    with open("neg_exp_output_train.pkl", "wb") as f:
         pickle.dump(output, f)
 
 
