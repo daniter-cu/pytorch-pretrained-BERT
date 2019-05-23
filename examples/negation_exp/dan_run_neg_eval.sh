@@ -3,7 +3,7 @@
 python eval_negation_exp.py \
   --bert_model bert-base-uncased \
   --do_train \
-  --model_weights ./model_neg_exp/pytorch_model1.bin \
+  --model_weights ./model_neg_exp/pytorch_model0.bin \
   --train_file ../../negation_training_data.pkl \
   --dev_file ../../negation_test_data.pkl \
   --output_dir ./model_neg_exp \
