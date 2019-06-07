@@ -1,4 +1,5 @@
 import json, pickle
+import torch
 
 import sys
 sys.path.append("../../../ner/BERT-NER/")
@@ -6,7 +7,10 @@ sys.path.append("../../../ner/BERT-NER/")
 from bert import Ner
 
 def get_ents(sent):
-    output =  model.predict(sent)
+    try:
+        output =  model.predict(sent)
+    except:
+        return None
     ents = []
     ent = None
     for k, v in output:
@@ -31,9 +35,11 @@ def get_ents(sent):
 if __name__ == '__main__':
 
     model = Ner("../../../ner/BERT-NER/out/")
+    device = torch.device("cuda")
+    model.model.to(device)
 
 
-    files = ["../../dataset/train-v2.0.json", "../../dataset/dev-v2.0.json"]
+    files = ["../../../Squad2Generative/data/train-v2.0.json", "../../../Squad2Generative/data/dev-v2.0.json"]
     for file in files:
         questions = []
         contexts = []
@@ -45,11 +51,7 @@ if __name__ == '__main__':
             data = jdata['data']
         for i in range(len(data)):
             section = data[i]['paragraphs']
-            if len(contexts) > 2:
-                break
             for sec in section:
-                if len(contexts) > 2:
-                    break
                 context = sec['context']
                 contexts.append(context)
                 qas = sec['qas']
@@ -66,8 +68,12 @@ if __name__ == '__main__':
         context_ents = []
         for q in questions:
             question_ents.append(get_ents(q))
+            if len(question_ents) % 100 == 0:
+                print("questions done:", len(question_ents))
         for c in contexts:
             context_ents.append(get_ents(c))
+            if len(context_ents) % 100 == 0:
+                print("Context ents done:", len(context_ents))
         with open(data_type+"-ents.pkl", "wb") as f:
             pickle.dump((context_ents, question_ents ) , f)
 
